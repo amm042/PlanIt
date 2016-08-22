@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="utf-8" name="viewport" content="width=device-width">
+<title>PlanIt</title>
+<script src="static/js/jquery-2.1.4.min.js"></script>
+<script src="static/js/bootstrap.min.js"></script>
+<script src="static/js/typeahead.bundle.min.js"></script>
+<script src="static/js/pace.min.js"></script>
+<script src="static/js/Please.min.js"></script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyCcWUTY-_-L06E_eF-2Jl1N0deipA5k99Y"></script>
+<script src="static/js/app.js"></script>
+</head>
+
+<body>
+<div class="container">
+    <div class="row" id="search-row">
+        <div class="col-md-8 col-md-offset-2" id="search-container">
+            <span class="site-logo"><span class="logo-color1">P</span><span class="logo-color1">l</span><span class="logo-color1">a</span><span class="logo-color1">n</span><span class="logo-color2">I</span><span class="logo-color2">t</span>
+            </span>
+            <div id="search-input">
+                <div class="input-group col-md-12" id="search">
+                    <input type="text" class="form-control input-lg typeahead" id="search-box" autocomplete="off" placeholder="Please enter a place in PA"/>
+                    <span class="input-group-btn">
+                        <button class="btn btn-info btn-lg button" type="button" id="search-button">
+                            <i class="fa fa-puzzle-piece"></i>
+                        </button>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-8 col-md-offset-2" id="place-selection">
+        </div>
+        <div class="col-md-8 col-md-offset-2" style="margin-top: 1.5em;">
+            <div id="map" style="height:500px;">
+            </div>
+        </div>
+
+        <div class="col-md-8 col-md-offset-2" tyle="width:600px; height:250px; margin-top: 1.5em;" id="graphDiv">
+        </div>
+    </div>
+</div>
+
+</body>
+
+</html>
+<link rel="stylesheet" href="static/css/bootstrap.min.css" type="text/css" />
+<link rel="stylesheet" href="static/css/font-awesome.min.css" type="text/css" />
+<link rel="stylesheet" href="static/css/typeahead.min.css" type="text/css" />
+<link rel="stylesheet" href="static/css/app.css" type="text/css" />
