@@ -5,3 +5,5 @@ singledispatch==3.4.0.3
 six==1.10.0
 tornado==4.4.1
 wsgiref==0.1.2
+census==0.8.1
+
