@@ -209,6 +209,7 @@ if __name__ == "__main__":
 	for n in nodes:
 		ax.plot(n.x, n.y, '+', markersize=12, color='black')
 
+		
 	with open("points.json", 'w') as f:
 		f.write (dumps([(n.x, n.y) for n in nodes]))
  
