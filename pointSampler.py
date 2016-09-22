@@ -162,9 +162,14 @@ if __name__ == "__main__":
 	states = set()
 	geoid = {}
 
-	latitude = 40.954910
-	longitude = -76.881304
-	max_distance_meters = 15 * 1000
+	# bucknell
+	#latitude = 40.954910
+	#longitude = -76.881304
+	#max_distance_meters = 15 * 1000
+	#denver capitol
+	latitude = 39.739110
+	longitude = -104.984753
+	max_distance_meters = 50 * 1000
 
 	# compute converage area and distance
 	area, dist = pbps.get_coverage(latitude, longitude, max_distance_meters)
@@ -209,7 +214,7 @@ if __name__ == "__main__":
 	for n in nodes:
 		ax.plot(n.x, n.y, '+', markersize=12, color='black')
 
-		
+
 	with open("points.json", 'w') as f:
 		f.write (dumps([(n.x, n.y) for n in nodes]))
  

@@ -66,6 +66,7 @@ class GeoPop():
 			return [ret[0][k] for k in fields]
 
 	def get_population_sf1(self, state, county=None, tract=None, fields=["P0010001"], **kwargs):
+		# sf1 is more complete than acs5. but acs5 has more fields.
 		# state, county, and tract params are specified with FIPS codes.
 		# override the default field if you want a different statistic
 		# fields from http://api.census.gov/data/2010/sf1/variables.json
@@ -177,7 +178,3 @@ if __name__=="__main__":
 			print("in the county [{} {}]: {}".format(s,c , g.get_population_sf1(s,c)))
 			print("in the tract [{} {} {}]:  {}".format(s,c,t, g.get_population_sf1(s, c, t)))
 
-
-
-	#border_block = get_census_block(28.35975,-81.421988)
-	#print(border_block)
