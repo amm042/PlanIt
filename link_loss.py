@@ -18,25 +18,28 @@ if __name__=="__main__":
 	a = (-76.881249, 40.954899)
 	
 	# house
-	b = (-76.897619, 40.955291)
+	#b = (-76.897619, 40.955291)
 	
 	# susquehanna
 	#b = (-76.872811, 40.798964, 20)
 
 	#philly
-	#a = (-75.1652,39.9526, 50)
+	#b = (-75.1652,39.9526, 50)
 	
 	#miami
 	#b = (-80.1918, 25.7617, 50)
 
+	#psu
 	
-	g = GeoPath(a,b, resolution = 1/36000)
+	b = (-77.859340, 40.798571 )
+	
+	g = GeoPath(a,b, resolution = 300)
 	print("a: {}".format(a))
 	print('path has {} points'.format(len(g.path)))
 	print("b: {}".format(b))
 	print("total distance is {} meters".format(g.distance()))
 
-	fig = plt.figure()
+	fig = plt.figure(figsize=(8.5,11))
 	ax = plt.subplot(311)
 
 	ax.get_xaxis().get_major_formatter().set_scientific(False)
@@ -64,13 +67,14 @@ if __name__=="__main__":
 	#ax.plot([g.point_distance(x, a) for x in g.path],
 			#[e.lookup_ws(x) for x in g.path], 'o-', color='red', ms=12, lw=2)
 
-	ax = plt.subplot(313)
+	ax = plt.subplot(313,sharex=ax)
 	ax.set_title('Path loss')
 
 	loss = loss_along_path(feet_to_meters(50), feet_to_meters(30), g)
 	ax.plot([g.point_distance(x, a) for x in g.path],
 			loss, '.-', color='green', ms=12, lw=2)
-	ax.set_ylim((80,120))
+	ax.set_ylim(bottom=80)
+	#ax.axis('tight')
 	#plt.subplots_adjust(hspace=0.40)
 	plt.tight_layout()
 	plt.show()

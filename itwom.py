@@ -2,6 +2,8 @@
 
 import pyitwom3
 
+from geopath import GeoPath
+
 
 class ItwomParams():
 	def __init__(self, **kwargs):
@@ -19,32 +21,73 @@ class ItwomParams():
 		for k,v in kwargs.items():
 			setattr(self,k,v)
 
-def loss_along_path(tx_height, rx_height, p, params=ItwomParams()):
+def itwomParams_city():
+	return ItwomParams(eps_dielect = 5, sgm_conductivity = 0.001)
+
+def point_loss(	tx_latlon, tx_height, 
+				rx_latlon, rx_height,
+				resolution=30, params=ItwomParams()):
+	"""return the loss between two points
+
+	A great circle path is constructed between the tx and rx points
+
+	resolution -- is the resolution for path generation in meters
+	params -- is a ItowmParams class object (or use the default)
+	"""
+	# print(tx_latlon, tx_height)
+	# print(rx_latlon, rx_height)
+	p = GeoPath(tx_latlon, rx_latlon, resolution=resolution)
+	return loss_along_path(tx_height, rx_height, p, params=params, evaluate_path=False)
+
+
+def loss_along_path(tx_height, rx_height, p, params=ItwomParams(), evaluate_path=True):
 	"""return the loss along path p using the itwom params
 
 	p -- is a GeoPath class object
 	params -- is a ItowmParams class object (or use the default)
+	evaluate_path -- if true the loss at all points on the path are computed, else
+	  just compute the path loss at the final point in the path.
 	Note we assume the points are equally spaced along the path"""
 
 	# allocate the height array across the entire path
 	elev = pyitwom3.doubleArray(2+len(p.path))
 	elev[0] = len(p.path)-1 # numpoints -1
 	elev[1] = p.distance() / elev[0] # distance between samples in meters
+	
 	for i,pt in enumerate(p.path):
-		print(i,pt)
+		#print(i,pt)
 		elev[2+i] = float(pt[2]) # elevation data
 
 	errnum = pyitwom3.intp()
 	loss = pyitwom3.doublep()
 
-	rslt = [0] # 0 db loss at source
-	for i in range(1,len(p.path)):
-		elev[0] = i
+	if evaluate_path:
+		rslt = [0] # 0 db loss at source
+		for i in range(1,len(p.path)):
+			elev[0] = i
 
-		for q in range(2+len(p.path)):
-			print(elev[q], ", ", end="")
-		print()
+			#for q in range(2+len(p.path)):
+			#	print(elev[q], ", ", end="")
+			#print()
 
+			strmode = pyitwom3.point_to_point(elev, tx_height, rx_height,
+				params.eps_dielect,
+				params.sgm_conductivity,
+				params.eno_ns_surfref,
+				params.freq_mhz,
+				params.radio_climate,
+				params.pol,
+				params.conf,
+				params.rel,
+				loss, errnum)
+			print("{:3d}: loss= {}, errnum={}, strmode={}".format(
+				i, 
+				pyitwom3.doublep.value(loss),
+				pyitwom3.intp.value(errnum),
+				strmode))
+			rslt.append(pyitwom3.doublep.value(loss))
+		return rslt
+	else:
 		strmode = pyitwom3.point_to_point(elev, tx_height, rx_height,
 			params.eps_dielect,
 			params.sgm_conductivity,
@@ -55,10 +98,5 @@ def loss_along_path(tx_height, rx_height, p, params=ItwomParams()):
 			params.conf,
 			params.rel,
 			loss, errnum)
-		print("{:3d}: loss= {}, errnum={}, strmode={}".format(
-			i, 
-			pyitwom3.doublep.value(loss),
-			pyitwom3.intp.value(errnum),
-			strmode))
-		rslt.append(pyitwom3.doublep.value(loss))
-	return rslt
+
+		return pyitwom3.doublep.value(loss)
