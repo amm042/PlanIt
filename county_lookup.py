@@ -3239,14 +3239,20 @@ _c = raw.split("\n")
 
 _states = {}
 _counties = {}
+_state_by_abbrev = {}
 for row in _c:
 	state, state_code, county_code, county_name, h_code = row.split(",")
+	if state not in _state_by_abbrev:
+		_state_by_abbrev[state] = state_code
 	if state_code not in _states:
 		_states[state_code] = state
 	state_county_code = state_code + county_code
 	if state_county_code not in _counties:
 		_counties[state_county_code] = county_name
 
+def state_num(state_abbrev):
+	return _state_by_abbrev[state_abbrev]
+	
 def state_name(state_code):
 	return _states[state_code]
 

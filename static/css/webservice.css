@@ -1,0 +1,14 @@
+/*Webservice specific CSS mods*/
+
+/*navbar needs to float on top*/
+body {
+  padding-top: 60px;
+}
+@media (max-width: 979px) {
+  body {
+    padding-top: 0px;
+  }
+}
+ul.nav li{
+  margin-right: 10px;
+}

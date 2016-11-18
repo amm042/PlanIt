@@ -133,7 +133,10 @@ if __name__ == "__main__":
 	#result = db['POINTRESULTS'].find({'name': cityname})
 	#print("{} has {} results.".format(cityname, result.count())
 
-	for cityname in db['POINTRESULTS'].distinct('name'):
+	#for cityname in db['POINTRESULTS'].distinct('name'):
+	#for cityname in ['Philadelphia']:
+	#for cityname in ['Pennsylvania']:
+	for cityname in ['Potter']:
 		# if cityname in ["Shamokin", "Uniontown", "Bethlehem", "Bradford", "Chester", "Clairton", 
 		# "Coatesville", "Connellsville", "DuBois", "Duquesne", "Easton", "Erie", "Aliquippa", "Allentown", "Altoona", 
 		# "Beaver Falls", "Farrell", "Arnold", "Franklin", "Jeannette", "Johnstown", "Lebanon", "Lock Haven", 
@@ -143,17 +146,18 @@ if __name__ == "__main__":
 		# "New Castle", "New Kensington", "Sharon"]:	
 
 			outputfile = "figures/"+cityname+"_coverage.pdf"
-			if os.path.exists(outputfile):
-				print("Skip {}, {} exists".format(cityname, outputfile))
-				continue
-				
+			
+			#if os.path.exists(outputfile):
+			#	print("Skip {}, {} exists".format(cityname, outputfile))
+			#	continue
+
 			print("processing {}".format(cityname))		
 
-			basestations = db['POINTRESULTS'].find({'name': cityname}).distinct('num_basestations')
+			basestations = db['POINTRESULTS'].find({'name': cityname, 'tx_height': 5, 'rx_height': 1}).distinct('num_basestations')
 
 			coverage_rate = {}
 			for b in basestations:
-				res = db['POINTRESULTS'].find({'name': cityname, 'num_basestations': b})
+				res = db['POINTRESULTS'].find({'name': cityname, 'tx_height': 5, 'rx_height': 1, 'num_basestations': b})
 
 				for result in res:
 					print("{} ({}) has coverage {} with {} basestation(s)".format(
@@ -175,9 +179,10 @@ if __name__ == "__main__":
 
 			fig = plt.figure(figsize = (8,8))
 			ax = plt.subplot(111)
+			kys = sorted(coverage_rate.keys())
 			ax.violinplot(
-				list(coverage_rate.values()), 
-				list(coverage_rate.keys()),
+				[coverage_rate[k] for k in kys], 
+				kys,
 				showmeans=False, showmedians=True)
 			
 			ax.set_title(cityname)

@@ -1,4 +1,4 @@
-"""MongoDB can perform spatial queries on GeoJSON objects, 
+"""MongoDB can perform spatial queries on GeoJSON objects,
 create the database by importing the census tract shapefiles.
 
 """
@@ -9,7 +9,25 @@ from pprint import pprint
 #import struct
 import traceback
 
-importCensusData = False
+importCensusData = True
+
+
+if 0:
+	#remove dupes from duble import
+	db = pymongo.MongoClient('mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015').get_default_database()
+	col = db['GENZ2010_040']
+
+	for geoid in col.distinct("properties.GEO_ID"):
+		print ("checking ", geoid)
+
+		dupes = col.find({"properties.GEO_ID": geoid}, {'_id':1, 'properties':1})
+		if dupes.count() > 1:
+			d = list(dupes)
+			print("keep ", d[0])
+
+			print("remove ", d[1:])
+			col.remove({"_id": {'$in': [x['_id'] for x in d[1:]]}})
+
 
 if importCensusData:
 	# see https://www.census.gov/geo/maps-data/data/summary_level.html for levels
@@ -25,24 +43,51 @@ if importCensusData:
 				continue
 			print("Reading: {}".format(shfile))
 			with fiona.open(shfile) as fc:
-				for shp in fc:		
+				for shp in fc:
 					col.insert_one(shp)
 					print(".", end="")
 
-	# import 160, state-place data
-	db = pymongo.MongoClient('mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015').get_default_database()
-	col = db['GENZ2010_160']
-	col.create_index([("geometry", pymongo.GEOSPHERE)])
+	if 0:
+		# import 160, state-place data
+		db = pymongo.MongoClient('mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015').get_default_database()
+		col = db['GENZ2010_160']
+		col.create_index([("geometry", pymongo.GEOSPHERE)])
 
-	for shfile in glob.glob('GENZ2010/gz_2010_*_160_00_500k.shp'):	
-		print("Reading: {}".format(shfile))
-		with fiona.open(shfile) as fc:
-			for shp in fc:
-				col.insert_one(shp)
-				print(".", end="")
+		for shfile in glob.glob('GENZ2010/gz_2010_*_160_00_500k.shp'):
+			print("Reading: {}".format(shfile))
+			with fiona.open(shfile) as fc:
+				for shp in fc:
+					col.insert_one(shp)
+					print(".", end="")
 
+	if 0:
+		# import US 050, state-county data for entire USA
+		db = pymongo.MongoClient('mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015').get_default_database()
+		col = db['GENZ2010_050']
+		col.create_index([("geometry", pymongo.GEOSPHERE)])
 
-importElevationData = True
+		for shfile in glob.glob('GENZ2010/gz_2010_*_050_00_500k.shp'):
+			print("Reading: {}".format(shfile))
+			with fiona.open(shfile) as fc:
+				for shp in fc:
+					col.insert_one(shp)
+					print(".", end="", flush=True)
+
+	if 0:
+		#import state outlines
+		#GENZ2010/gz_2010_us_040_00_500k.shp
+		db = pymongo.MongoClient('mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015').get_default_database()
+		col = db['GENZ2010_040']
+		col.create_index([("geometry", pymongo.GEOSPHERE)])
+
+		for shfile in glob.glob('GENZ2010/gz_2010_us_040_00_500k.shp'):
+			print("Reading: {}".format(shfile))
+			with fiona.open(shfile) as fc:
+				for shp in fc:
+					col.insert_one(shp)
+					print("add {}".format(shp['properties']['NAME']))
+
+importElevationData = False
 
 if importElevationData:
 
@@ -75,14 +120,13 @@ if importElevationData:
 	for hgtfile in sorted(glob.glob('../../SRTMGL1/*.zip')):
 	#for hgtfile in ['../../SRTMGL1/N40W076.SRTMGL1.hgt.zip']:
 		print("opening: {}".format(hgtfile))
-		
 
 		bn = os.path.basename(hgtfile)
 		if bn[0] != 'N':
 			continue
 		if bn[3] != 'W':
 			continue
-		
+
 		with zipfile.ZipFile(hgtfile, 'r') as z:
 
 			for zipcontent in z.namelist():
@@ -90,7 +134,7 @@ if importElevationData:
 				dbdoc = col.find_one({"type":"Feature", "properties.SrcFile": zipcontent})
 
 				if dbdoc == None:
-					data = z.read(zipcontent)					
+					data = z.read(zipcontent)
 					tmphgtfile = os.path.join(tempfile.gettempdir(), zipcontent)
 					try:
 						with open(tmphgtfile, 'wb') as wf:
@@ -116,7 +160,7 @@ if importElevationData:
 							traceback.print_exc()
 							continue
 
-						def lim(lng,lat):							
+						def lim(lng,lat):
 							if lng < -180:
 								lng = -180
 							if lng > 180:
@@ -124,11 +168,11 @@ if importElevationData:
 							return lng,lat
 
 						# create the poly that bounds this raster
-						# ref: http://www.gdal.org/classGDALDataset.html#a5101119705f5fa2bc1344ab26f66fd1d				
-						
-						# fix with inverse affine with points 0,0, 0,3600, 3600,3600		
+						# ref: http://www.gdal.org/classGDALDataset.html#a5101119705f5fa2bc1344ab26f66fd1d
+
+						# fix with inverse affine with points 0,0, 0,3600, 3600,3600
 						poly = (
-									(		
+									(
 										lim(gt[0], gt[3]),						# top left
 										lim(gt[0]+d.RasterXSize*gt[1], gt[3]),	# top right
 										lim(gt[0]+d.RasterXSize*gt[1]+d.RasterYSize*gt[2], gt[3]+d.RasterXSize*gt[4]+d.RasterYSize*gt[5]), # bottom right
@@ -136,15 +180,15 @@ if importElevationData:
 										lim(gt[0], gt[3])
 									)
 								)
-						#polygeo = geojson.dumps(poly, sort_keys=True)					
-						
+						#polygeo = geojson.dumps(poly, sort_keys=True)
+
 						#raster = r1.ReadAsArray(0,0, d.RasterXSize, d.RasterYSize)
-						
-						#raster = r1.ReadRaster(0,0,d.RasterXSize, d.RasterYSize, 
+
+						#raster = r1.ReadRaster(0,0,d.RasterXSize, d.RasterYSize,
 						#	d.RasterXSize, d.RasterYSize, gdalconst.GDT_Int16)
 						rmin,rmax,rmean,rstdev = r1.GetStatistics(True, True)
 						doc = {	'type': 'Feature',
-								'geometry': {'type': 'Polygon', 'coordinates': [poly]}, 
+								'geometry': {'type': 'Polygon', 'coordinates': [poly]},
 								'properties':{
 											"SrcFile": zipcontent,
 											"TileName": os.path.splitext(zipcontent)[0],
@@ -157,12 +201,12 @@ if importElevationData:
 											"RasterFile": gfs_id
 									}
 								}
-							
+
 						print (json_util.dumps(doc,sort_keys=True))
 						col.insert_one(doc)
 					finally:
 						if os.path.exists(tmphgtfile):
-							os.remove(tmphgtfile)						
+							os.remove(tmphgtfile)
 				else:
 					print("{} is already in db!: {}".format(zipcontent, dbdoc['_id']))
 
@@ -180,7 +224,7 @@ if importElevationData:
 		# 			d.append(values)
 		# 			i += 1
 
-		
+
 		i+=1
 
 	print(i)

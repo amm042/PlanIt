@@ -26,7 +26,8 @@ from pprint import pprint
 
 import random
 
-from multiprocessing import Process, Queue
+from multiprocessing import Process
+#from threading import Thread
 
 
 def plot_contours(area, points, fig, ax, plot_legend= True, plot_points= True):
@@ -131,21 +132,24 @@ def plot_shapes(ax, shapes, filled = False, show_states = False, fc=None, alpha=
 		for p in patches:
 			ax.add_patch(p)
 
-def evaluate_points(num_base, loss_threshold, pointdoc, result_q):
+def evaluate_points(num_base, loss_threshold, pointdoc, tx_height, rx_height):
 	"called from multiprocessing"
-	results = []
-	cr = []
 	
 	# to save our results.
 	connection = pymongo.MongoClient('mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015')
 	db = connection.get_default_database()	
+
+	print("evaluating points for {} bs (tx {} rx {}) -- {} points".format(
+			num_base, tx_height, rx_height, len(pointdoc)))
 
 	# should be 100 point docs.
 	for d in pointdoc:
 		
 		olddocs = db['POINTRESULTS'].find({
 						'point_docid': d['_id'], 
-						'num_basestations': num_base},
+						'num_basestations': num_base,
+						'tx_height': tx_height,
+						'rx_height': rx_height},
 						{'_id': 1})
 		dc = olddocs.count()
 		if dc > 1:
@@ -158,6 +162,8 @@ def evaluate_points(num_base, loss_threshold, pointdoc, result_q):
 			print("{} ({} bs) - {} done already".format(d['name'], num_base, d['_id']))
 			continue
 
+		print("processing points for {} ({} bs) (tx {} rx {}) -- {} points".format(
+			d['name'], num_base, tx_height, rx_height, len(pointdoc)))
 		# select base station point(s)
 		basestations = random.sample(d['points'], num_base)
 
@@ -174,6 +180,8 @@ def evaluate_points(num_base, loss_threshold, pointdoc, result_q):
 			'nodes': [],
 			'basestations': basestations,
 			'gentime': datetime.datetime.utcnow(),
+			'tx_height': tx_height,
+			'rx_height': rx_height
 			}
 		loss = []
 
@@ -192,43 +200,23 @@ def evaluate_points(num_base, loss_threshold, pointdoc, result_q):
 			else:
 				#compute loss to all basestations, and save the lowest loss path
 				l = [point_loss(
-					(b['coordinates'][0], b['coordinates'][1]), 15,
-					(p['coordinates'][0], p['coordinates'][1]), 8,
+					(b['coordinates'][0], b['coordinates'][1]), tx_height,
+					(p['coordinates'][0], p['coordinates'][1]), rx_height,
 					params=itwomParams_city()) for b in basestations]
 					
 				min_loss = min(l)
 				loss.append(min_loss)
 
 				if min_loss < loss_threshold:
-					connected += 1					
+					connected += 1
 				else:
-					disconnected += 1
-					
+					disconnected += 1					
 
 				resultdoc['nodes'].append({'point':p, 'loss': l, 'min_loss': min_loss, 'connected': min_loss < loss_threshold})
 
 		resultdoc['connected'] = connected / (connected+disconnected)
-		cr.append(connected / (connected+disconnected))
-		results.append(loss)
 
 		db['POINTRESULTS'].insert_one(resultdoc)
-
-
-		#if len(results) > 3:
-			#break
-
-	# fig = plt.figure(figsize = (8,8))
-	# ax = plt.subplot(111)
-	# if num_base  == 1:
-	# 	ax.set_title("{} basestation".format(num_base))
-	# else:
-	# 	ax.set_title("{} basestations".format(num_base))
-	# ax.violinplot(results, showmeans=False, showmedians=True)
-	# ax.plot( range(2+len(results)), [loss_threshold]*(2+len(results)), '--', color='gray', lw=1)
-	# ax.set_ylim((80,200))
-	# ax.set_ylabel("loss (dB)")
-
-	result_q.put( (num_base, cr))
 	
 
 if __name__=="__main__":
@@ -243,7 +231,12 @@ if __name__=="__main__":
 
 	jobs = []	
 
-	for city_name in db['POINTS'].find({"LSAD":"city"}).distinct("name"):
+	# to process all cities
+	#for city_name in db['POINTS'].find({"LSAD":"city"}).distinct("name"):
+	#for city_name in ['St. Marys']:
+	#for city_name in ['Pennsylvania']:
+	#for city_name in ['Philadelphia']:
+	for city_name in ['Potter']:
 		pointdocs = db['POINTS'].find({"name":city_name})
 		print("{} has {} points".format(
 			city_name, 
@@ -252,8 +245,8 @@ if __name__=="__main__":
 		#if city_name not in ['Philadelphia']:
 			#continue
 		
-		if city_name not in ['Parker']:
-			continue
+		#if city_name not in ['Parker']:
+#			continue
 		# if city_name not in ["Clairton", 
 		# 	"Coatesville", "Connellsville", "DuBois", "Duquesne", "Easton", "Erie", "Aliquippa", "Allentown", "Altoona", 
 		# 	"Beaver Falls", "Farrell", "Arnold", "Franklin", "Jeannette", "Johnstown", "Lebanon", "Lock Haven", 
@@ -276,17 +269,17 @@ if __name__=="__main__":
 			del jobs[0]
 
 		loss_threshold = 158
-		max_basestations = 6
+		max_basestations = 12
 		jobres = {}
 
-		results = Queue()
 
 		for num_base in range(1,max_basestations+1):
 			j = Process(target=evaluate_points, 
-					args=(num_base, loss_threshold, r, results), 
+					args=(num_base, loss_threshold, r, 5, 1), 
 					name="{} {} basestations".format(city_name, num_base))
 			jobs.append(j)
 			j.start()
+			#evaluate_points(num_base, loss_threshold, r, 5, 1)
 
 	for j in jobs:
 		j.join()

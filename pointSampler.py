@@ -1,4 +1,4 @@
-"""MongoDB can perform spatial queries on GeoJSON objects, 
+"""MongoDB can perform spatial queries on GeoJSON objects,
 try a query to select census tracts by distance.
 
 """
@@ -28,10 +28,10 @@ import math
 
 def compute_land_area(shp):
 	# see http://gis.stackexchange.com/questions/127607/area-in-km-from-polygon-of-coordinates
-	
+
 	if type(shp) is Polygon or type(shp) is MultiPolygon:
 		print("shp is: ({})".format(type(shp), shp))
-		poly = shp		
+		poly = shp
 		shp = {'properties': {'area': None, 'population': {'frac_contained': 1}}}
 	elif type(shp) is dict:
 		poly = shape(shp['geometry'])
@@ -40,7 +40,7 @@ def compute_land_area(shp):
 		print("shp is: ({})".format(type(shp), shp))
 		# multipolygon catch
 		poly = shp
-		shp = {'properties': {'area': None, 'population': {'frac_contained': 1}}}		
+		shp = {'properties': {'area': None, 'population': {'frac_contained': 1}}}
 	a = ops.transform(
 		    partial(
 				transform,
@@ -55,9 +55,9 @@ def compute_land_area(shp):
 		'total': a.area,
 		'frac_contained': shp['properties']['population']['frac_contained'],
 		'effective': a.area * shp['properties']['population']['frac_contained']
-	} 
+	}
 	return shp
-	
+
 
 class PopulationBasedPointSampler():
 	def __init__(self, census_apikey="ca22eb30af97c6b471419d7fe22b9ce9a5d1fe8d"):
@@ -74,25 +74,30 @@ class PopulationBasedPointSampler():
 		self.census_col = self.db['CENSUS2010_SF1']
 
 
-	def get_coverage(self, latitude = 40.954910, longitude = -76.881304, max_distance_meters = 15 * 1000):
+	def get_coverage(self, longitude = -76.881304, latitude = 40.954910,  max_distance_meters = 15 * 1000, sides=64):
 
-		if 0:
-			# this is not correct, have to create the circle in meters, then trasform back to lat/lon on the wgs84 projection
+		# this still has problems, do it manually in lat/lon space to generate
+		# a polygon with given number of sides.
 
-			# compute lat/lon at max distance with heading of 0 degrees (north so latitude will be different)
-			elon, elat, eaz = self.geod.fwd(longitude, latitude, 0, max_distance_meters)
-			# now we can construct a circle of max distance
-			max_area = Point(longitude, latitude).buffer(abs(elat-latitude))
-			return max_area, max_distance_meters
+		if 1:
+			pts = []
+			for az in np.arange (0,360, 360/sides):
+				elon, elat, eaz = self.geod.fwd(longitude, latitude, az, max_distance_meters)
+				pts.append( (elon, elat) )
+
+			p = Polygon(pts)
+
+			return p, max_distance_meters
+
 		else:
 			p1 = Proj(init='EPSG:4326') # lat lon
-			p2 = Proj(proj='aea')
+			p2 = Proj(proj='merc')
 
 			x,y = transform(p1, p2, longitude, latitude)
 
 			p = Point(x,y).buffer(max_distance_meters)
-			print ("x,y = ", x, y)
-			pprint(p)
+			print ("x,y = {} area is = {}".format(tuple(p.centroid.coords), p.area))
+			# pprint(p)
 
 			project = partial(
 				transform,
@@ -116,9 +121,9 @@ class PopulationBasedPointSampler():
 		p = shp['properties']
 
 		#print(p)
-		
+
 		# for later use
-		p['label'] = "{} {} [{}]".format(state_name(p['STATE']), 
+		p['label'] = "{} {} [{}]".format(state_name(p['STATE']),
 				county_name(p['STATE'],p['COUNTY']), p['TRACT'])
 
 		pop = {}
@@ -137,7 +142,7 @@ class PopulationBasedPointSampler():
 			#print("Hit.")
 			raw_pop = cdoc['variable']['P0010001']
 		else:
-			raw_pop = int(self.census.sf1.state_county_tract("P0010001", p['STATE'], 
+			raw_pop = int(self.census.sf1.state_county_tract("P0010001", p['STATE'],
 						p['COUNTY'], p['TRACT'])[0]["P0010001"])
 			insdoc = {
 					'state': p["STATE"],
@@ -170,21 +175,22 @@ class PopulationBasedPointSampler():
 		#print("contained population: {}".format(frac_contained * raw_pop))
 		pop['effective'] = frac_contained * raw_pop
 
-		p['population'] = pop		
+		p['population'] = pop
 
 		shp['properties'] = p
 		# add area
 		compute_land_area(shp)
 
-	def get_tract_shapes_in_area(self, area):
-		"like get shapes but returns all tracts that intersect the shapely polygon area (doesn't use distance)"
-		
+	def get_tract_shapes_in_area(self, area, limit=None):
+		"""like get shapes but returns all tracts that intersect the shapely
+		polygon area (doesn't use distance)"
+		"""
+
 		if type(area) is dict:
 			area = shape(area['geometry'])
 			#print ("area is now ", type(area))
 
 			#pprint(area)
-
 
 		if type(area) is MultiPolygon:
 			for poly in area.geoms:
@@ -193,49 +199,78 @@ class PopulationBasedPointSampler():
 
 		elif type(area) is Polygon:
 
-			query = {'geometry': {'$geoIntersects': {'$geometry': {'type': 'Polygon', 'coordinates': [list(area.exterior.coords)]}}}}
-
-			for shp in self.db.GENZ2010_140.find(query):
+			#query = {'geometry': {'$geoIntersects': {'$geometry': {'type': 'Polygon', 'coordinates': [list(area.exterior.coords)]}}}}
+			#query = {'geometry': {'$geoIntersects': {'$geometry': mapping(area)}}}
+			query = {'geometry': {'$geoWithin': {'$geometry': mapping(area)}}}
+			cursor = self.db.GENZ2010_140.find(query)
+			print("{} shapes to get within area.".format(cursor.count()))
+			if limit != None:
+				cursor = cursor.limit(limit)
+			for shp in cursor:
 				self._add_pop_to_shape_intersct(shp, area)
 
 				#pprint(shp)
 
 				# filter out areas with very low population
 				# the mongodb geo query may be not exact
-				if shp['properties']['area']['frac_contained']*shp['properties']['population']['raw'] < 0.1: 
-					print ("WARN: clipping: {}".format(shp['properties']['label']))
-					pprint(shp['properties'])
+				if shp['properties']['area']['frac_contained']*shp['properties']['population']['raw'] < 0.1:
+					print ("WARN: clipping: {} effective population = {}".format(
+						shp['properties']['label'],
+						shp['properties']['population']['effective']))
+					#pprint(shp['properties'])
 					continue
 
 				yield shp
-		else: 
+
+			# now get interscting shapes
+			query = {'geometry': {'$geoIntersects': {'$geometry': mapping(area)}}}
+			cursor = self.db.GENZ2010_140.find(query)
+			print("{} shapes to get intersecting area.".format(cursor.count()))
+			if limit != None:
+				cursor = cursor.limit(limit)
+			for shp in cursor:
+				self._add_pop_to_shape_intersct(shp, area)
+
+				#pprint(shp)
+
+				# filter out areas with very low population
+				# the mongodb geo query may be not exact
+				if shp['properties']['area']['frac_contained']*shp['properties']['population']['raw'] < 0.1:
+					print ("WARN: clipping: {} effective population = {}".format(
+						shp['properties']['label'],
+						shp['properties']['population']['effective']))
+					#pprint(shp['properties'])
+					continue
+
+				yield shp
+		else:
 			raise Exception("Unsupporty shape: {}".format(type(area)))
 
 
 	def get_shapes(self, max_area, max_distance_meters):
-		"return the shapes [census tracts] that touch the center of max_area + max_distance and add population data"		
+		"return the shapes [census tracts] that touch the center of max_area + max_distance and add population data"
 
 		longitude = max_area.centroid.x
 		latitude = max_area.centroid.y
 
-		query = {'geometry': {'$near': SON([('$geometry', 
-			SON([('type', 'Point'), ('coordinates', [longitude, latitude])])), 
+		query = {'geometry': {'$near': SON([('$geometry',
+			SON([('type', 'Point'), ('coordinates', [longitude, latitude])])),
 				('$maxDistance', max_distance_meters)])}}
 
-		
+
 		for shp in self.db.GENZ2010_140.find(query):
 			self._add_pop_to_shape_intersct(shp, max_area)
 
 			# filter out areas with very low population
 			# the mongodb geo query may be not exact
-			if shp['properties']['area']['frac_contained']*shp['properties']['population']['raw'] < 0.1: 
+			if shp['properties']['area']['frac_contained']*shp['properties']['population']['raw'] < 0.1:
 				print ("WARN: clipping: {}".format(shp['properties']['label']))
 				pprint(shp['properties'])
 				continue
 
 			yield shp
 
-	def random_point_inside(self, container, centroid, bounds):
+	def random_point_inside(self, container):
 		"return a random location contained inside container shape"
 
 		# get the bounding box.
@@ -251,8 +286,17 @@ class PopulationBasedPointSampler():
 				container = shape(container)
 		cminx, cminy, cmaxx, cmaxy = container.bounds
 		#minx, miny, maxx, maxy = bounds
-		range_x = math.sqrt(min( cmaxx - centroid.x, centroid.x - cminx))/3.0
-		range_y = math.sqrt(min( cmaxy - centroid.y, centroid.y - cminy))/3.0
+		centroid = container.centroid
+
+		try:
+			range_x = math.sqrt(min( cmaxx - centroid.x, centroid.x - cminx))/3.0
+			range_y = math.sqrt(min( cmaxy - centroid.y, centroid.y - cminy))/3.0
+		except ValueError as x:
+			print('range calc error')
+			print('bounds: ', end="")
+			pprint(container.bounds)
+			print('centroid: ', centroid)
+			raise x
 
 		while True:
 			# normal distribution with std.dev=range and mean = centroid of shape.
@@ -264,8 +308,12 @@ class PopulationBasedPointSampler():
 
 		return p
 
-	def sample(self, n, shapes, max_area, centroid, bounds):
-		"return a sample of n random points within the given area sampled from shapes using their effective pop"
+	def sample(self, n, shapes, max_area, intersect = False):
+		"""return a sample of n random points within the given area sampled from
+		shapes using their effective pop
+		if interset is true only the intersection of each shape with max_area
+		is used.
+		"""
 		tot_pop = 0
 		for s in shapes:
 			tot_pop += s['properties']['population']['effective']
@@ -275,15 +323,25 @@ class PopulationBasedPointSampler():
 		rates = [0.0]* len(shapes)
 		for i,s in enumerate(shapes):
 			rates[i] = float(s['properties']['population']['effective']) / tot_pop
-			print("rate is {} from {}".format(rates[i], s['properties']['label']))
-		
+
+			# shp['properties']['area']['frac_contained']*shp['properties']['population']['raw']
+			print("rate is {}, total pop: {}, effective pop: {}, contained: {} from {}"
+				.format(
+					rates[i],
+					s['properties']['population']['raw'],
+					s['properties']['population']['effective'],
+					s['properties']['area']['frac_contained'],
+					s['properties']['label']))
+
 		#sample using population rate
 		s = np.random.choice(shapes, size=n, replace=True, p=rates)
 
-		pts = []		
+		pts = []
 		for q in s:
-			#pts.append (self.random_point_inside(q['intersection'], centroid))
-			pts.append (self.random_point_inside(q['geometry'], centroid, bounds))
+			if intersect:
+				pts.append (self.random_point_inside(q['intersection']))
+			else:
+				pts.append (self.random_point_inside(q['geometry']))
 			#print("[{:3}] -- {}: {}".format(i, q['properties']['label'], pts[i]))
 		return pts
 
@@ -291,17 +349,17 @@ class PopulationBasedPointSampler():
 def make_patch(geo, **kwargs):
 	"takes a geoJSON geometry and returns something matplotlib understands"
 	if geo['type'] == 'Polygon':
-		return [PolygonPatch(shp['geometry'],**kwargs)]
-		
+		return [PolygonPatch(geo,**kwargs)]
+
 	elif geo['type'] == 'MultiPolygon':
 		p = []
 		for poly in shape(geo):
 			p.append(PolygonPatch(poly, **kwargs))
-			
+
 		return p
 	else:
 		pprint(geo)
-		raise Exception("unsupported geometry")		
+		raise Exception("unsupported geometry")
 if __name__ == "__main__":
 
 
@@ -309,7 +367,7 @@ if __name__ == "__main__":
 	fig = plt.figure(figsize=(4.25,4))
 	ax = plt.subplot(111)
 
-	
+
 	states = set()
 	geoid = {}
 
@@ -317,7 +375,7 @@ if __name__ == "__main__":
 	latitude = 40.954910
 	longitude = -76.881304
 	max_distance_meters = 15 * 1000
-	
+
 	#denver capitol
 	#latitude = 39.739110
 	#longitude = -104.984753
@@ -325,27 +383,27 @@ if __name__ == "__main__":
 
 	# compute converage area and distance
 	area, dist = pbps.get_coverage(latitude, longitude, max_distance_meters)
-	
+
 	# have to buffer the results to see how many colors to generate
 	results = list(pbps.get_shapes(area, dist))
 	color_list = plt.cm.Dark2(np.linspace(0, 1, len(results)))
 
 	# get the shapes covered by the coverage area.
-	for i, shp in enumerate(results):			
+	for i, shp in enumerate(results):
 		p = shp['properties']
-		
+
 		#track states we hit
 		if p['STATE'] not in states:
-			states.add(p['STATE'])	
+			states.add(p['STATE'])
 		# also store the goeid so we dont plot again later
 		geoid[p['GEO_ID']] = shp
-		
-		label = "{} {} [{}]".format(state_name(p['STATE']), 
+
+		label = "{} {} [{}]".format(state_name(p['STATE']),
 					county_name(p['STATE'],p['COUNTY']), p['TRACT'])
 
 		#print ("-"*10 + label + "-"*10)
 		#pprint(p['population'])
-		
+
 		ec = 'black'
 		lw = 2
 		if p['population']['effective'] < 0.01:
@@ -369,14 +427,14 @@ if __name__ == "__main__":
 
 	with open("points.json", 'w') as f:
 		f.write (dumps([(n.x, n.y) for n in nodes]))
- 
+
 
 	#ax.legend(loc='upper center', bbox_to_anchor=(0.5, -0.15),
 	 #         fancybox=True, shadow=True, ncol=1)
 
 	#	cent = shape(shp['geometry']).centroid
 		#print("centroid is: {}".format(cent))
-				
+
 	if 1: #turnd off to make faster
 		# plot the rest of the sate in grayscale
 
@@ -386,13 +444,13 @@ if __name__ == "__main__":
 		print("getting the rest of the tracts...")
 		# draw all states we plotted but with low oppacity
 		for state in states:
-			
+
 			results = list(pbps.get_shapes_for_state(state))
 			color_list = plt.cm.gray(np.linspace(0, 1, len(results)))
 
 			print("plotting the rest of the tracts...")
 			for i,shp in enumerate(results):
-				
+
 				patches = make_patch(shp['geometry'], alpha=0.15, fc=color_list[i], ec='black', lw=0.5, label=label)
 				for p in patches:
 					ax.add_patch(p)
@@ -407,14 +465,14 @@ if __name__ == "__main__":
 		ax = plt.subplot(111)
 
 		print("getting CO rest of the tracts...")
-		# draw all states we plotted but with low oppacity	
+		# draw all states we plotted but with low oppacity
 		for state in ['08']:
 			query = {'properties.STATE': state}
 			results = list(db.GENZ2010_140.find(query))
 			color_list = plt.cm.Set1(np.linspace(0, 1, len(results)))
 
 			print("plotting the rest of the tracts...")
-			for i,shp in enumerate(results):			
+			for i,shp in enumerate(results):
 				patches = make_patch(shp['geometry'], alpha=0.35, fc=color_list[i], ec='black', lw=1, label=label)
 				for p in patches:
 					ax.add_patch(p)

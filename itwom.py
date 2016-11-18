@@ -23,10 +23,14 @@ class ItwomParams():
 
 def itwomParams_city():
 	return ItwomParams(eps_dielect = 5, sgm_conductivity = 0.001)
+def itwomParams_average():
+	return ItwomParams(eps_dielect = 15, sgm_conductivity = 0.005)
 
-def point_loss(	tx_latlon, tx_height, 
+def point_loss(	tx_latlon, tx_height,
 				rx_latlon, rx_height,
-				resolution=30, params=ItwomParams()):
+				resolution=30,
+				params=itwomParams_average(),
+				elev= None):
 	"""return the loss between two points
 
 	A great circle path is constructed between the tx and rx points
@@ -36,11 +40,11 @@ def point_loss(	tx_latlon, tx_height,
 	"""
 	# print(tx_latlon, tx_height)
 	# print(rx_latlon, rx_height)
-	p = GeoPath(tx_latlon, rx_latlon, resolution=resolution)
+	p = GeoPath(tx_latlon, rx_latlon, resolution=resolution, elev=elev)
 	return loss_along_path(tx_height, rx_height, p, params=params, evaluate_path=False)
 
 
-def loss_along_path(tx_height, rx_height, p, params=ItwomParams(), evaluate_path=True):
+def loss_along_path(tx_height, rx_height, p, params=itwomParams_average(), evaluate_path=True):
 	"""return the loss along path p using the itwom params
 
 	p -- is a GeoPath class object
@@ -53,10 +57,19 @@ def loss_along_path(tx_height, rx_height, p, params=ItwomParams(), evaluate_path
 	elev = pyitwom3.doubleArray(2+len(p.path))
 	elev[0] = len(p.path)-1 # numpoints -1
 	elev[1] = p.distance() / elev[0] # distance between samples in meters
-	
-	for i,pt in enumerate(p.path):
+
+	edata = [pt[2] for pt in p.path]
+
+	# itwom doesn't like negative elevations, shift everything up.
+	minel = min(edata)
+	if minel < 0:
+		offset= abs(minel)
+		for i in range (len(edata)):
+			edata[i]+=offset
+
+	for i,pt in enumerate(edata):
 		#print(i,pt)
-		elev[2+i] = float(pt[2]) # elevation data
+		elev[2+i] = float(pt) # elevation data
 
 	errnum = pyitwom3.intp()
 	loss = pyitwom3.doublep()
@@ -66,9 +79,10 @@ def loss_along_path(tx_height, rx_height, p, params=ItwomParams(), evaluate_path
 		for i in range(1,len(p.path)):
 			elev[0] = i
 
-			#for q in range(2+len(p.path)):
-			#	print(elev[q], ", ", end="")
-			#print()
+			# print("point_to_point: ")
+			# for q in range(2+len(p.path)):
+			# 	print(elev[q], ", ", end="")
+			# print()
 
 			strmode = pyitwom3.point_to_point(elev, tx_height, rx_height,
 				params.eps_dielect,
@@ -80,14 +94,21 @@ def loss_along_path(tx_height, rx_height, p, params=ItwomParams(), evaluate_path
 				params.conf,
 				params.rel,
 				loss, errnum)
-			print("{:3d}: loss= {}, errnum={}, strmode={}".format(
-				i, 
-				pyitwom3.doublep.value(loss),
-				pyitwom3.intp.value(errnum),
-				strmode))
+			# print("{:3d}: loss= {}, errnum={}, strmode={}".format(
+			# 	i,
+			# 	pyitwom3.doublep.value(loss),
+			# 	pyitwom3.intp.value(errnum),
+			# 	strmode))
 			rslt.append(pyitwom3.doublep.value(loss))
 		return rslt
 	else:
+		# print("point_to_point: ")
+		# for q in range(2+len(p.path)):
+		# 	print(elev[q], ", ", end="")
+		# print()
+
+
+
 		strmode = pyitwom3.point_to_point(elev, tx_height, rx_height,
 			params.eps_dielect,
 			params.sgm_conductivity,
@@ -99,4 +120,4 @@ def loss_along_path(tx_height, rx_height, p, params=ItwomParams(), evaluate_path
 			params.rel,
 			loss, errnum)
 
-		return pyitwom3.doublep.value(loss)
+		return pyitwom3.doublep.value(loss), strmode

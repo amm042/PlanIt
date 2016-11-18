@@ -28,17 +28,23 @@ class Elevation():
 		mongo_str -- connection string to mongodb server / gridfs containing the STRM tiles.
 	"""
 
-	def __init__(self, strm_path="./SRTM", zip_path="../../SRTMGL1/", 
+	def __init__(self, srtm_path="./SRTM", zip_path="../../SRTMGL1/", 
 		mongo_str="mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015"):
 
-		self.db = pymongo.MongoClient(mongo_str).get_default_database()
-		self.strm = self.db['STRMGL1']
-		self.strm_path = strm_path
-		self.zip_path = zip_path
-		self.gfs = gridfs.GridFS(self.db)
+		if mongo_str != None:
+			self.db = pymongo.MongoClient(mongo_str).get_default_database()
+			self.strm = self.db['STRMGL1']
+			self.gfs = gridfs.GridFS(self.db)
+		else:
+			self.db = None
+			self.strm = None
+			self.gfs = None
 
-		if not os.path.exists(strm_path):
-			os.makedirs(strm_path)
+		self.srtm_path = srtm_path
+		self.zip_path = zip_path
+		
+		if not os.path.exists(srtm_path):
+			os.makedirs(srtm_path)
 	
 
 		self.url = 'http://ned.usgs.gov/epqs/pqs.php'
@@ -107,7 +113,7 @@ class Elevation():
 			
 			# load into memory cache
 			if not tile in cache:			
-				local_tilefile = os.path.join(self.strm_path, tile)
+				local_tilefile = os.path.join(self.srtm_path, tile)
 				if not os.path.exists(local_tilefile):	
 
 					if os.path.exists(os.path.join(self.zip_path, ziptile)):
@@ -117,10 +123,10 @@ class Elevation():
 							for zipcontent in zf.namelist():
 								print("unzipping {} --> {}".format(
 									os.path.join(self.zip_path, ziptile),
-									os.path.join(self.strm_path, zipcontent)))
+									os.path.join(self.srtm_path, zipcontent)))
 
 								data = zf.read(zipcontent)
-								with open(os.path.join(self.strm_path, zipcontent), 'wb') as outf:
+								with open(os.path.join(self.srtm_path, zipcontent), 'wb') as outf:
 									outf.write(data)
 
 					else:

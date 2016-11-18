@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en" ng-app="PlanItWebApp">
+<head>
+<title>PlanIt WebServices</title>
+
+<meta name="google-signin-client_id" content="645762832040-gcp2qd1fkgta26c3218l8c43roqsvrnk.apps.googleusercontent.com">
+
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/bootstrap-tour-standalone.min.css') }}">
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/bootstrap-theme.min.css') }}">
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/app.css') }}">
+<link rel=stylesheet type=text/css href="{{ url_for('static', filename='css/webservice.css') }}">
+
+
+{% block head %}{% endblock %}
+</head>
+
+<body>
+<nav class="navbar navbar-default navbar-fixed-top">
+  <div class="container">
+    <a class="navbar-brand" href="#">PlanIt WebServices</a>
+
+    {% if not session.logged_in %}
+
+      <ul class="nav navbar-nav navbar-right">
+        <!-- <li><div class="g-signin2 navbar-btn" data-onsuccess="planit.onSignIn"></div></li> -->
+        <li><button id="signinButton" type="button" class="btn navbar-btn btn-default" onclick="planit.signIn();">Sign in</button></li>
+        <!-- <li><button id="signoutButton" type="button" class="btn navbar-btn btn-default" onclick="planit.signOut();">Sign out</button></li> -->
+      </ul>
+    <!-- <button type="button" class="btn btn-default navbar-btn navbar-right">Sign in</button> -->
+      <!-- <a href="{{ url_for('login') }}">log in</a> -->
+    {% else %}
+      <ul class="nav navbar-nav navbar-right">
+        <li><p class="navbar-text">Signed in as <a href="#" class="navbar-link">{{ user.name }}</a></p></li>
+        <!-- <li><div class="g-signin2 navbar-btn" data-onsuccess="planit.onSignIn"></div></li> -->
+        <!-- <li><a class="btn navbar-btn btn-default" href="{{ url_for ('logout')}}">Sign out</a></li> -->
+        <li><button id="signoutButton" type="button" class="btn navbar-btn btn-default" onclick="planit.signOut();">Sign out</button></li>
+    <!-- <button type="button" class="btn btn-default navbar-btn navbar-right">Sign out</button> -->
+      <!-- <a href="{{ url_for('logout') }}">log out</a> -->
+      <!-- <div class="g-signin2 navbar-btn navbar-right"><a href="#" onclick="signOut();">Sign out</a></div> -->
+      </ul>
+    {% endif %}
+
+  </div>
+</nav>
+
+<div class="container">
+  {% for message in get_flashed_messages() %}
+    <div class=flash>{{ message }}</div>
+  {% endfor %}
+  {% block body %}{% endblock %}
+</div>
+
+
+
+<script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+<!-- <script src="https://apis.google.com/js/platform.js" async defer></script> -->
+<script src="{{ url_for ('static', filename='js/angular.min.js') }}"></script>
+<!-- <script src="https://apis.google.com/js/client:platform.js?onload=planit.start" async defer></script> -->
+<script src="https://apis.google.com/js/platform.js"></script>
+
+<script src="{{ url_for ('static', filename='js/wsapp.js') }}"></script>
+<script src="{{ url_for ('static', filename='js/ngPlanIt.js')}}"></script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

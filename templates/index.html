@@ -1,0 +1,27 @@
+{% extends "layout.html" %}
+
+{% block body %}
+
+    {% if not session.logged_in %}
+
+    <h3> Please sign in. </h3>
+
+    {% else %}
+
+    <h3> Api Keys: </h3>
+
+      <apikeys user={{ user.sub |tojson }}></apikeys>
+
+    <h3> Services: </h3>
+      <ul>
+      {% for service in services %}
+        <li><a href="{{ url_for(service.func) }}">{{ service.name }}</a></li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+
+{% endblock %}
+
+{% block scripts %}
+  <script src="{{ url_for ('static', filename='js/apikeys/apikeys.component.js')}}"></script>
+{% endblock %}

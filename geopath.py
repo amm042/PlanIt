@@ -15,13 +15,17 @@ class GeoPath():
 	elev -- elevation provider, must have a lookup method that takes a location tuple
 	resolution -- step size to use in meters
 	"""
-	def __init__(self, src, dst, elev = Elevation(), resolution=30):
+	def __init__(self, src, dst, elev = None, resolution=30, **kwargs):
 		self.src = src
 		self.dst = dst
 		self.elev = elev
 
 		self.geod = Geod(ellps='WGS84')
 
+		if elev == None:
+			
+			self.elev = Elevation(**kwargs)
+		
 		az1, az2, dist = self.geod.inv(
 			src[0], src[1], 
 			dst[0], dst[1])

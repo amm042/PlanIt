@@ -32,111 +32,101 @@ from multiprocessing import Process, Queue
 
 if __name__=="__main__":
 
-	
-	
-
-
-
 	connection = pymongo.MongoClient('mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015')
 	db = connection.get_default_database()	
 	pbps = PopulationBasedPointSampler("ca22eb30af97c6b471419d7fe22b9ce9a5d1fe8d")
 
-	query = {'properties.LSAD': 'city', 'properties.STATE': '42'}
-	for city_shp in db['GENZ2010_160'].find(query):
+	#query = {'properties.LSAD': 'city', 'properties.STATE': '42'}
+	#for container_shape in db['GENZ2010_160'].find(query):
+	#query = {'properties.NAME':'Pennsylvania'}
+	#for container_shape in db['GENZ2010_040'].find(query):
 
-		num_samples = 100
+	query = {'properties.NAME': 'Potter', 'properties.STATE': '42'}
+	for container_shape in db['GENZ2010_050'].find(query):
+
+		print("sampling ", container_shape['properties'])
+
+		num_samples = 10
+		# 1000 for citys
+		# 10000 for states
+		num_points_per_sample = 1000
 
 		# quick check if this city already has points...
-		q2 = {'state': city_shp['properties']['STATE'], 'name':city_shp['properties']['NAME']}
+		q2 = {'state': container_shape['properties']['STATE'], 'name':container_shape['properties']['NAME']}
 		have_pts = db['POINTS'].find(q2).count()
 		if have_pts >= num_samples:
-			print("already have {} points for {}".format(have_pts, city_shp['properties']['NAME']))				
+			print("already have {} points for {}".format(have_pts, container_shape['properties']['NAME']))				
 			continue
 
 		pts_to_gen = num_samples- have_pts
-		print("generating {} points for {}".format(pts_to_gen, city_shp['properties']['NAME']))
+		print("generating {} points for {}".format(pts_to_gen, container_shape['properties']['NAME']))
+		if pts_to_gen < 1:
+			continue
+
+		# compute converage area and distance
+		#area, dist = pbps.get_coverage(latitude, longitude, max_distance_meters)
+		#print ("got coverage")
+
+		# get the covered shapes
+		#shapes = list(pbps.get_shapes(area, dist))
+
+		area = shape(container_shape['geometry'])
+
+		centroid = area.centroid
+		bounds = area.bounds
+
+		print ("got area centroid={}, bounds={}".format(centroid, bounds))
+
+		shapegen = pbps.get_tract_shapes_in_area(area, limit=None)
+		shapes = []
+		# grow area if any tract is outside of the initial area
+		for shp in shapegen:
+			shobj = shape(shp['geometry'])
+			if not area.contains(shobj):
+				print("growing area to fully contain {}".format(shp['properties']['label']))
+				area = area.union(shobj)
+			shapes.append(shp)
+
+		# area is now the union of all shapes to accoutn for when census tract is larger than place shape
+		#area = shape(shapes[0]['geometry'])
+		#for shp in shapes[1:]:
+	#		area = area.union(shape(shp['geometry']))
+
+		print ("sampling points.")		
 		# number of times to generate points per location.
 		for i in range(pts_to_gen):
 
-			# bucknell
-			#latitude = 40.954910
-			#longitude = -76.881304
-			#max_distance_meters = 10 * 1000
-
-
-			# penn 
-			# name = "UPenn"
-			# latitude = 39.951988
-			# longitude= -75.193512
-			# max_distance_meters = 10 * 1000
-
-			# compute converage area and distance
-			#area, dist = pbps.get_coverage(latitude, longitude, max_distance_meters)
-			#print ("got coverage")
-
-			# get the covered shapes
-			#shapes = list(pbps.get_shapes(area, dist))
-
-			area = shape(city_shp['geometry'])
-
-			centroid = area.centroid
-			bounds = area.bounds
-
-			print(centroid, bounds)
-
-			shapes = list(pbps.get_tract_shapes_in_area(area))
-
-			# area is now the union of all shapes to accoutn for when census tract is larger than place shape
-			area = shape(shapes[0]['geometry'])
-			for shp in shapes[1:]:
-				area = area.union(shape(shp['geometry']))
-
-
-			print ("got shapes")
-			print (centroid, bounds)
-			points = pbps.sample(1000, shapes, area, centroid, bounds)
+			points = pbps.sample(num_points_per_sample, shapes, area)
 
 			#for shp in shapes:
 				#pprint(shp)
 
-			print ("got points")
+			print ("got points {}".format(i))
 
 			covered_pop = sum([s['properties']['population']['effective'] for s in shapes])
 			total_area = sum([s['properties']['area']['effective'] for s in shapes])
 			
-			print("shapes in {}: {}".format(city_shp['properties']['NAME'], len(shapes)))
+			print("shapes in {}: {}".format(container_shape['properties']['NAME'], len(shapes)))
 			print("covered population: {}".format (covered_pop))
 			print("total area: {}".format(total_area))
 			#pprint(area)
 			a = compute_land_area(area)
 			print("area's area: ", a)
-			
-
-			# fig = plt.figure(figsize = (8,8), dpi=300)
-			# ax = plt.subplot(111)
-
-			# plot_shapes(ax, shapes)
-			# ax.add_patch(PolygonPatch(area, fc='none',ec='red', lw='1', alpha=0.60))
-			# ax.axis("equal")
-			# plt.show()
-
-			# exit()
-
-			col = db['POINTS']
-
+		
 			gentime = datetime.datetime.utcnow()
 
-			col.insert_one({			
+			db['POINTS'].insert_one({			
 				'gentime': gentime,
 				#'center': (longitude, latitude),
 				#'distance': max_distance_meters,
-				'state': city_shp['properties']['STATE'],
-				'name': city_shp['properties']['NAME'],
-				'LSAD': 'city',
+				'state': container_shape['properties']['STATE'],
+				'name': container_shape['properties']['NAME'],
+				'LSAD': container_shape['properties']['LSAD'],
 				'area': total_area,
 				'population': covered_pop,
 				'points': [mapping(p) for p in points],
-				'shapes': shapes
+				#'shapes': shapes  # for states shapes are too big to store in this doc, just store doc ids
+				'shape_ids': [shp['_id'] for shp in shapes]
 			})
 
 
