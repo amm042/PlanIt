@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" ng-app="PlanItWebApp">
+<html lang="en">
 <head>
 <title>PlanIt WebServices</title>
 
@@ -18,26 +18,22 @@
 <body>
 <nav class="navbar navbar-default navbar-fixed-top">
   <div class="container">
-    <a class="navbar-brand" href="#">PlanIt WebServices</a>
+    <a class="navbar-brand" href="{{ url_for ('index') }}">PlanIt WebServices</a>
 
     {% if not session.logged_in %}
 
       <ul class="nav navbar-nav navbar-right">
-        <!-- <li><div class="g-signin2 navbar-btn" data-onsuccess="planit.onSignIn"></div></li> -->
-        <li><button id="signinButton" type="button" class="btn navbar-btn btn-default" onclick="planit.signIn();">Sign in</button></li>
-        <!-- <li><button id="signoutButton" type="button" class="btn navbar-btn btn-default" onclick="planit.signOut();">Sign out</button></li> -->
+
+        <li><button id="signinButton" type="button" class="btn navbar-btn btn-default" onclick="usercontrol.signIn();">Sign in</button></li>
+
       </ul>
-    <!-- <button type="button" class="btn btn-default navbar-btn navbar-right">Sign in</button> -->
-      <!-- <a href="{{ url_for('login') }}">log in</a> -->
+
     {% else %}
       <ul class="nav navbar-nav navbar-right">
         <li><p class="navbar-text">Signed in as <a href="#" class="navbar-link">{{ user.name }}</a></p></li>
-        <!-- <li><div class="g-signin2 navbar-btn" data-onsuccess="planit.onSignIn"></div></li> -->
-        <!-- <li><a class="btn navbar-btn btn-default" href="{{ url_for ('logout')}}">Sign out</a></li> -->
-        <li><button id="signoutButton" type="button" class="btn navbar-btn btn-default" onclick="planit.signOut();">Sign out</button></li>
-    <!-- <button type="button" class="btn btn-default navbar-btn navbar-right">Sign out</button> -->
-      <!-- <a href="{{ url_for('logout') }}">log out</a> -->
-      <!-- <div class="g-signin2 navbar-btn navbar-right"><a href="#" onclick="signOut();">Sign out</a></div> -->
+
+        <li><button id="signoutButton" type="button" class="btn navbar-btn btn-default" onclick="usercontrol.signOut();">Sign out</button></li>
+
       </ul>
     {% endif %}
 
@@ -54,13 +50,12 @@
 
 
 <script src="//ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
-<!-- <script src="https://apis.google.com/js/platform.js" async defer></script> -->
 <script src="{{ url_for ('static', filename='js/angular.min.js') }}"></script>
-<!-- <script src="https://apis.google.com/js/client:platform.js?onload=planit.start" async defer></script> -->
+
 <script src="https://apis.google.com/js/platform.js"></script>
 
-<script src="{{ url_for ('static', filename='js/wsapp.js') }}"></script>
-<script src="{{ url_for ('static', filename='js/ngPlanIt.js')}}"></script>
+<script src="{{ url_for ('static', filename='js/usercontrol.js') }}"></script>
+
 
 {% block scripts %}{% endblock %}
 </body>

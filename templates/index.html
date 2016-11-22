@@ -8,20 +8,19 @@
 
     {% else %}
 
-    <h3> Api Keys: </h3>
-
-      <apikeys user={{ user.sub |tojson }}></apikeys>
+    <h3> Applications: </h3>
+    <ul>
+      {% for application in applications %}
+        <li><a href="{{ url_for(application.func) }}">{{ application.name }}</a></li>
+      {% endfor %}
+    </ul>
 
     <h3> Services: </h3>
       <ul>
-      {% for service in services %}
-        <li><a href="{{ url_for(service.func) }}">{{ service.name }}</a></li>
-      {% endfor %}
+        {% for service in services %}
+          <li><a href="{{ url_for(service.func) }}">{{ service.name }}</a></li>
+        {% endfor %}
       </ul>
     {% endif %}
 
-{% endblock %}
-
-{% block scripts %}
-  <script src="{{ url_for ('static', filename='js/apikeys/apikeys.component.js')}}"></script>
 {% endblock %}

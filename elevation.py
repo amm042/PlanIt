@@ -23,12 +23,12 @@ cache = {}
 
 class Elevation():
 	""" Find the elevation of a given lat/lon location on earth using SRTM data
-		
+
 		srtm_path -- the local path to cache STRM tiles
 		mongo_str -- connection string to mongodb server / gridfs containing the STRM tiles.
 	"""
 
-	def __init__(self, srtm_path="./SRTM", zip_path="../../SRTMGL1/", 
+	def __init__(self, srtm_path="./SRTM", zip_path="../../SRTMGL1/",
 		mongo_str="mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015"):
 
 		if mongo_str != None:
@@ -42,10 +42,10 @@ class Elevation():
 
 		self.srtm_path = srtm_path
 		self.zip_path = zip_path
-		
+
 		if not os.path.exists(srtm_path):
 			os.makedirs(srtm_path)
-	
+
 
 		self.url = 'http://ned.usgs.gov/epqs/pqs.php'
 		#?x=-76.88670566666667&y=40.95502966666667&units=Meters&output=json
@@ -53,9 +53,9 @@ class Elevation():
 	def geoToCoord(self, p, a):
 		"convert the geo point (lon,lat) p to row, col value using the given affine transform"
 		# http://www.perrygeo.com/python-affine-transforms.html
-		
+
 		col,row = ~a*(p[0], p[1])
-		
+
 		# print("raw affine: ",col,row)
 		# convert to ints. the transform alread references the pixel center so truncate gives
 		# nearest pixel
@@ -88,9 +88,9 @@ class Elevation():
 		global cache, locker
 
 		# don't allow multiple threads to create new files, let one thread do it, the others will pickup the local file.
-		# locker.acquire()
+		locker.acquire()
 
-		try:	
+		try:
 
 			if p[0] < 0:
 				ew = 'W'
@@ -110,16 +110,16 @@ class Elevation():
 			ziptile= "{}{:02d}{}{:03d}.SRTMGL1.hgt.zip".format(
 				ns, int(abs(math.floor(p[1]))),
 				ew,int(abs(math.floor(p[0]))))
-			
+
 			# load into memory cache
-			if not tile in cache:			
+			if not tile in cache:
 				local_tilefile = os.path.join(self.srtm_path, tile)
-				if not os.path.exists(local_tilefile):	
+				if not os.path.exists(local_tilefile):
 
 					if os.path.exists(os.path.join(self.zip_path, ziptile)):
 
 						with zipfile.ZipFile(os.path.join(self.zip_path, ziptile)) as zf:
-							
+
 							for zipcontent in zf.namelist():
 								print("unzipping {} --> {}".format(
 									os.path.join(self.zip_path, ziptile),
@@ -138,10 +138,10 @@ class Elevation():
 							import time
 							time.sleep(3)
 						else:
-							print("getting {} bytes from {} to {}.".format(fp.length, fp, local_tilefile))							
+							print("getting {} bytes from {} to {}.".format(fp.length, fp, local_tilefile))
 							with open(local_tilefile, 'wb') as lfp:
 								lfp.write(fp.read())
-				
+
 				if os.path.exists(local_tilefile):
 					# load from disk to memory cache
 					print("loading tile: {}".format(local_tilefile))
@@ -165,18 +165,18 @@ class Elevation():
 						'transform': Affine.identity(), # doesn't really matter
 						'raster': numpy.zeros((3601, 3601))
 					}
-			
+
 			row,col = self.geoToCoord((p[0],p[1]), cache[tile]['transform'])
-			
+
 			#print("transform = {}".format(self.cache[tile]['transform']))
 			# mrow = self.cache[tile]['rows']
 			# mcol = self.cache[tile]['cols']
 			# print("{} == {} has elev {}".format(p, (row,col),self.cache[tile]['raster'][row % mrow][col % mcol]))
-			
+
 			return cache[tile]['raster'][row][col]
 		finally:
-			# locker.release()
-			pass
+			locker.release()
+			
 
 if __name__ == "__main__":
 
@@ -185,25 +185,25 @@ if __name__ == "__main__":
 
 	#a = ( -74.0059,40.7128, 50)#nyc
 	#b = ( -118.2437,34.0522, 20)#la
-	
+
 	# breakiron
 	a = (-76.881249, 40.954899)
-	
+
 	# house
 	b = (-76.897619, 40.955291)
-	
+
 	# susquehanna
 	#b = (-76.872811, 40.798964, 20)
 
 	#philly
 	#b = (-75.1652,39.9526, 50)
-	
+
 	#miami
 	#b = (-80.1918, 25.7617, 50)
 
-	#psu	
+	#psu
 	b = (-77.859340, 40.798571 )
-	from geopath import GeoPath	
+	from geopath import GeoPath
 	import matplotlib.pyplot as plt
 
 	g = GeoPath(a,b, resolution = 300)
@@ -217,7 +217,7 @@ if __name__ == "__main__":
 
 
 
-	
+
 	ax.set_title('Elevation Profile')
 	ax.plot([g.point_distance(x, a) for x in g.path],
 			[x[2] for x in g.path], 's-', color='black', ms=6, lw=2, label="SRTM1")

@@ -2,14 +2,14 @@
 (function(global) {
   'use strict'
 
-  var planit = {};
+  var usercontrol = {};
   var me = this;
 
-  planit.start = function() {
+  usercontrol.start = function() {
     console.log("start method called.");
     console.log(global.gapi);
     global.gapi.load('auth2', function() {
-      planit.auth2 = global.gapi.auth2.init({
+      usercontrol.auth2 = global.gapi.auth2.init({
         client_id: '645762832040-gcp2qd1fkgta26c3218l8c43roqsvrnk.apps.googleusercontent.com',
         // Scopes to request in addition to 'profile' and 'email'
         //scope: 'additional_scope'
@@ -17,14 +17,14 @@
     });
   };
 
-  planit.signIn = function(){
+  usercontrol.signIn = function(){
     console.log(me)
-    console.log(planit)
+    console.log(usercontrol)
 
-    // planit.auth2.grantOfflineAccess({'redirect_uri': 'postmessage'}).then(planit.signInCallback);
-     planit.auth2.signIn().then(planit.signInCallback);
+    // usercontrol.auth2.grantOfflineAccess({'redirect_uri': 'postmessage'}).then(usercontrol.signInCallback);
+     usercontrol.auth2.signIn().then(usercontrol.signInCallback);
   };
-  planit.signInCallback = function(googleUser){
+  usercontrol.signInCallback = function(googleUser){
     console.log("got user");
     console.log(googleUser);
 
@@ -40,7 +40,7 @@
       // Send the code to the server
       $.ajax({
         type: 'POST',
-        url: 'login',
+        url: 'user/login',
         success: function(result) {
           // Handle or verify the server response.
           console.log("ajax result")
@@ -56,7 +56,7 @@
     }
   };
 
-planit.onSignIn = function(googleUser) {
+usercontrol.onSignIn = function(googleUser) {
     var profile = googleUser.getBasicProfile();
     console.log(profile)
     console.log('ID: ' + profile.getId()); // Do not send to your backend! Use an ID token instead.
@@ -66,18 +66,18 @@ planit.onSignIn = function(googleUser) {
   };
 
 
-  planit.signOut = function() {
+  usercontrol.signOut = function() {
 
-    planit.auth2.signOut().then(function () {
+    usercontrol.auth2.signOut().then(function () {
       console.log('User signed out.');
-      global.location="logout"
+      global.location="user/logout"
     });
   };
 
-  global.planit = planit;
+  global.usercontrol = usercontrol;
 
 })(window);
 
 $(function () { // Same as document.addEventListener("DOMContentLoaded"...
-  planit.start();
+  usercontrol.start();
 });
