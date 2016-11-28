@@ -2,7 +2,7 @@
   <div class="loading-spinner"><img src="static/img/ajax-loader.gif" /></div>
 </div>
 
-<div class="container" >
+<div class="container">
   <table ng-show="$ctrl.keys.length > 0" class='table table-condensed table-striped'>
     <thead>
       <tr>
@@ -15,16 +15,17 @@
       </tr>
     </thead>
     <tbody>
-      <tr ng-repeat="key in $ctrl.keys track by $index">
+      <tr ng-repeat="key in $ctrl.keys track by $index" ng-class="class=key.active ? '' : 'danger disabled'">
         <td style="word-break:break-all">{{ key.signature }}</td>
         <td>{{ key.created }}</td>
         <td>{{ key.active }}</td>
         <td>{{ key.use_info.length }}</td>
         <td>{{ key.use_info[key.use_info.length] }}</td>
-        <td>a<button class="btn btn-default btn-sm" ng-click="$ctrl.remove($index)")>Remove</button>
-            <button class="btn btn-default btn-sm" ng-show="key.active == false" ng-click="$ctrl.enable($index)")>Enable</button>
-            <button class="btn btn-default btn-sm" ng-show="key.active == true" ng-click="$ctrl.disable($index)")>Disable</button>
-          </td>
+        <td><div class="btn-group-vertical">
+          <button class="btn btn-default btn-sm" ng-click="$ctrl.remove($index)")>Remove</button>
+          <button class="btn btn-default btn-sm" ng-show="key.active == false" ng-click="$ctrl.enable($index)")>Enable</button>
+          <button class="btn btn-default btn-sm" ng-show="key.active == true" ng-click="$ctrl.disable($index)")>Disable</button>
+        </div></td>
       </tr>
     </tbody>
   </table>

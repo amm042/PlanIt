@@ -1,0 +1,13 @@
+{% extends "layout.html" %}
+
+{% block body %}
+<div ng-app="ApiKeysApp">
+<h3> Api Keys: </h3>
+<apikeys user={{ user.sub |tojson }} staticprefix={{url_for ('keyapi.static', filename='') |tojson}} apiprefix={{url_for ('keyapi.index')}}></apikeys>
+</div>
+{% endblock %}
+
+{% block scripts %}
+  <!-- <script src="{{ url_for ('static', filename='js/ngPlanIt.js')}}"></script> -->
+  <script src="{{ url_for ('keyapi.static', filename='js/apikeys/apikeys.component.js')}}"></script>
+{% endblock %}

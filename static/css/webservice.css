@@ -12,3 +12,7 @@ body {
 ul.nav li{
   margin-right: 10px;
 }
+.disabled {
+    opacity: 0.6; /* Real browsers */
+    filter: alpha(opacity = 60); /* MSIE */
+}
