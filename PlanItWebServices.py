@@ -11,18 +11,16 @@ import datetime
 from web.login import bp_login
 from web.keyapi import bp_keyapi
 from web.planitapi import bp_planitapi
+from web.root import bp_root
 # from web import *
 from web.data import *
 from web.decorators import *
-
 
 app = Flask('main')
 app.config.update({
     'MONGO_HOST': 'eg-mongodb',
     'MONGO_PORT': 27017,
     'MONGO_DBNAME': 'planit',
-    #'MONGO_USERNAME': 'owner',
-    #'MONGO_PASSWORD': '1M$t5iOqXzWMw&aM'
     'MONGO_USERNAME': 'webservice',
     'MONGO_PASSWORD': 'F7ZGLY86xjby',
 })
@@ -35,24 +33,7 @@ planitdb.init_db(app)
 app.register_blueprint(bp_login, url_prefix='/user')
 app.register_blueprint(bp_keyapi, url_prefix='/keys')
 app.register_blueprint(bp_planitapi, url_prefix='/planit')
-
-applications = [
-    {'name': 'PlanIt', 'func': 'planitapi.index'},
-    {'name': 'API key manager', 'func': 'keyapi.index'}
-]
-services = [
-        {'name':'Elevation', 'func': "planitapi.elevation"}
-        ]
-
-@app.route("/")
-@log
-def index():
-    # logging.info("index, session is: {}".format(session))
-    if 'logged_in' in session and session['logged_in'] == True and 'token' not in session:
-        session.clear()
-
-    return render_template('index.html', user=session.get('token'),
-        services=services, applications=applications)
+app.register_blueprint(bp_root)
 
 if __name__=="__main__":
 
