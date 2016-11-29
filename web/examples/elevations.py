@@ -13,9 +13,9 @@ def get_elevation(lat, lon):
     return r.json()['result']
 
 
-for lon,lat in [    (-76.881249, 40.954899),
-	                (-76.897619, 40.955291),
-                    (-106.013942, 39.473847)]:
+for lon,lat in [(-76.881249, 40.954899),
+	            (-76.897619, 40.955291),
+                (-106.013942, 39.473847)]:
     print('{}, {} has elevation = {} meters'.format(
         lat,
         lon,
