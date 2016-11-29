@@ -1,10 +1,12 @@
 # flask /wsgi
-from gevent.pywsgi import WSGIServer
+from gevent.wsgi import WSGIServer
 from flask import Flask
 
 # logging
 import logging
 import logging.handlers
+import os
+import sys
 
 # blueprints
 from web.login import bp_login
@@ -15,7 +17,7 @@ from web.root import bp_root
 # data layer
 from web.data import planitdb
 
-logfile =  os.path.splitext(sys.argv[0])[0] + ".log"
+logfile = os.path.splitext(sys.argv[0])[0] + ".log"
 
 logging.basicConfig(
     level = logging.DEBUG,
