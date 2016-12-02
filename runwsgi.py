@@ -15,6 +15,7 @@ from web.login import bp_login
 from web.keyapi import bp_keyapi
 from web.planitapi import bp_planitapi
 from web.root import bp_root
+from web.thedocs import bp_doc
 
 # data layer
 from web.data import planitdb
@@ -54,11 +55,13 @@ app.register_blueprint(bp_login, url_prefix='/planit/user')
 app.register_blueprint(bp_keyapi, url_prefix='/planit/keys')
 app.register_blueprint(bp_planitapi, url_prefix='/planit/api')
 app.register_blueprint(bp_root, url_prefix='/planit')
-@app.errorhandler(404)
-def page_not_found(error):
-    print(error)
-    print(request.url)
-    return "page not found", 404
+app.register_blueprint(bp_doc, url_prefix='/planit/doc')
+
+# @app.errorhandler(404)
+# def page_not_found(error):
+#     print(error)
+#     print(request.url)
+#     return "page not found", 404
 
 @app.before_request
 def redirect_eg():

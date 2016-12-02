@@ -7,6 +7,7 @@ bp_root = Blueprint('root', __name__, static_folder='static',
 
 applications = [
     {'name': 'PlanIt', 'func': 'planitapi.index'},
+    {'name': 'Docs', 'func': 'thedoc.index'},
     {'name': 'API key manager', 'func': 'keyapi.index'}
 ]
 services = [
