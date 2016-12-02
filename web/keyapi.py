@@ -13,6 +13,7 @@ bp_keyapi = Blueprint('keyapi', __name__,
 
 @bp_keyapi.route('/')
 @log
+@require_login
 def index():
     return render_template('keyapi.html', user=session.get('token'))
 

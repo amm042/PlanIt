@@ -132,15 +132,20 @@ class Elevation():
 					else:
 
 						print("need tile: {} from gridfs".format(tile))
-						fp = self.gfs.find_one({'filename':tile})
-						if fp == None:
-							print("Warning tile {} not found on gridfs, assuming sea level (zeros)".format(tile))
-							import time
-							time.sleep(3)
+						
+						if self.gfs == None:
+							raise Exception("Could not load tile at {}".format(local_tilefile))
+							
 						else:
-							print("getting {} bytes from {} to {}.".format(fp.length, fp, local_tilefile))
-							with open(local_tilefile, 'wb') as lfp:
-								lfp.write(fp.read())
+							fp = self.gfs.find_one({'filename':tile})
+							if fp == None:
+								print("Warning tile {} not found on gridfs, assuming sea level (zeros)".format(tile))
+								import time
+								time.sleep(3)
+							else:
+								print("getting {} bytes from {} to {}.".format(fp.length, fp, local_tilefile))
+								with open(local_tilefile, 'wb') as lfp:
+									lfp.write(fp.read())
 
 				if os.path.exists(local_tilefile):
 					# load from disk to memory cache
@@ -173,7 +178,7 @@ class Elevation():
 			# mcol = self.cache[tile]['cols']
 			# print("{} == {} has elev {}".format(p, (row,col),self.cache[tile]['raster'][row % mrow][col % mcol]))
 
-			return cache[tile]['raster'][row][col]
+			return float(cache[tile]['raster'][row][col])
 		finally:
 			locker.release()
 			

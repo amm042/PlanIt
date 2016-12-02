@@ -5,13 +5,36 @@ from .data import planitdb, jsonify
 import logging
 import traceback
 
+#http://flask.pocoo.org/snippets/93/
+def ssl_required(fn):
+    @wraps(fn)
+    def decorated_view(*args, **kwargs):    
+        if request.is_secure:
+            return fn(*args, **kwargs)
+        else:
+            return redirect(request.url.replace("http://", "https://"))            
+    return decorated_view
+
 def require_key(f):
     @wraps(f)
     def wrapper(*args, **kwargs):
-        if 'key' not in request.args:
+
+        # logging.info("headers: {}".format(request.headers))
+        # logging.info("form: {}".format(request.form))
+        # logging.info("json: {}".format(request.json))
+        # logging.info("data: {}".format(request.data))
+        # logging.info("args: {}".format(request.args))
+        # logging.info("values: {}".format(request.values))
+        # logging.info("stream: {}".format(request.stream.read()))
+    
+        if 'key' in request.args:
+            key = request.args['key']
+        elif 'key' in request.json:
+            key = request.json['key']
+        else:
             return jsonify({"error": "No key specified."}, status_code=401)
 
-        if planitdb.validate_key(request.args['key'], request.remote_addr):
+        if planitdb.validate_key(key, request.remote_addr):
             return f(*args, *kwargs)
         else:
             return jsonify({"error": "Key is invalid or disabled."}, status_code=401)

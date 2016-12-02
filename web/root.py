@@ -1,8 +1,10 @@
-from flask import Blueprint, session
+from flask import Blueprint, session, render_template
 import logging
 from .decorators import *
 
-bp_root = Blueprint('root', __name__)
+bp_root = Blueprint('root', __name__, static_folder='static',
+    template_folder ='templates')
+
 applications = [
     {'name': 'PlanIt', 'func': 'planitapi.index'},
     {'name': 'API key manager', 'func': 'keyapi.index'}
@@ -18,5 +20,5 @@ def index():
     if 'logged_in' in session and session['logged_in'] == True and 'token' not in session:
         session.clear()
 
-    return render_template('index.html', user=session.get('token'),
+    return render_template('root/index.html', user=session.get('token'),
         services=services, applications=applications)

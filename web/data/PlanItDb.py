@@ -51,7 +51,10 @@ class planItDb():
         if 'active' not in doc:
             return False
 
-        op = {'$inc': {'use_info.use_count': 1}}
+        op = {
+            '$inc': {'use_info.use_count': 1},
+            '$set': {'use_info.last_used': datetime.datetime.utcnow()}
+            }
         if remote_addr not in doc['use_info']['remotes']:
             op['$push'] = {'use_info.remotes': remote_addr}
         self.mongo.db.keys.update({'_id': doc['_id']}, op)

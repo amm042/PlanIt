@@ -81,6 +81,13 @@ angular.module("ApiKeysApp")
         for (var i in keys){
           var d = new Date(keys[i].created.$date);
           keys[i].created = d.toString();
+
+          if (keys[i].use_info.last_used){
+            var d = new Date(keys[i].use_info.last_used.$date);
+            keys[i].use_info.last_used = d.toString();          
+          }else{
+            keys[i].use_info.last_used = '-'
+          }
         }
         console.log(keys);
         me.keys = keys;

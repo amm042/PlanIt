@@ -9,7 +9,9 @@ from oauth2client import client, crypt
 from .data import *
 from .decorators import *
 
-bp_login = Blueprint('login', __name__)
+bp_login = Blueprint('login', __name__,
+    template_folder ='templates',
+    static_folder = 'static')
 
 CLIENT_ID = "645762832040-gcp2qd1fkgta26c3218l8c43roqsvrnk.apps.googleusercontent.com"
 
@@ -47,12 +49,12 @@ def login():
             session['token'] = idinfo
 
             flash('You were logged in')
-            rsp = {"redirect": url_for('index')}
+            rsp = {"redirect": url_for('root.index')}
 
             return jsonify(rsp)
         else:
             return jsonify({"error": "no id_token!"})
-    return redirect(url_for('index'))
+    return redirect(url_for('root.index'))
 
 @bp_login.route('/logout')
 @log
@@ -61,4 +63,4 @@ def logout():
     # session.pop('token', None)
     session.clear()
     flash('You were logged out')
-    return redirect(url_for('index'))
+    return redirect(url_for('root.index'))

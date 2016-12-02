@@ -6,21 +6,21 @@
   <table ng-show="$ctrl.keys.length > 0" class='table table-condensed table-striped'>
     <thead>
       <tr>
-        <th class="col-md-4">Key</th>
-        <th class="col-md-4">Created</th>
+        <th class="col-md-5">Key</th>
+        <th class="col-md-2">Created</th>
         <th class="col-md-1">Active</th>
         <th class="col-md-1">Use Count</th>
-        <th class="col-md-1">Last Used</th>
+        <th class="col-md-2">Last Used</th>
         <th class="col-md-1">Actions</th>
       </tr>
     </thead>
     <tbody>
-      <tr ng-repeat="key in $ctrl.keys track by $index" ng-class="class=key.active ? '' : 'danger disabled'">
+      <tr ng-repeat="key in $ctrl.keys track by $index" ng-class="class=key.active ? '' : 'danger'">
         <td style="word-break:break-all">{{ key.signature }}</td>
         <td>{{ key.created }}</td>
         <td>{{ key.active }}</td>
-        <td>{{ key.use_info.length }}</td>
-        <td>{{ key.use_info[key.use_info.length] }}</td>
+        <td>{{ key.use_info.use_count }}</td>
+        <td>{{ key.use_info.last_used }}</td>
         <td><div class="btn-group-vertical">
           <button class="btn btn-default btn-sm" ng-click="$ctrl.remove($index)")>Remove</button>
           <button class="btn btn-default btn-sm" ng-show="key.active == false" ng-click="$ctrl.enable($index)")>Enable</button>
