@@ -19,8 +19,10 @@ import traceback
 import inspect
 import time
 
-
 from shapely.geometry import mapping, shape, Point, Polygon, MultiPolygon
+
+
+from .utils.pointSampler import PopulationBasedPointSampler
 
 SRTM_PATH="../SRTM_RAW"
 elev = Elevation(srtm_path=SRTM_PATH, mongo_str= None)
@@ -141,8 +143,8 @@ def simplifyPoly(name, p):
     "p must be a geojson Polygon"
     sh = shape(p)
 
-    for d in [10.0, 20.0, 40]:
-        sh2 = sh.simplify(sh.length/20.0, preserve_topology=True)
+    for d in [25, 50, 100]:
+        sh2 = sh.simplify(sh.length/d, preserve_topology=True)
         if sh2.is_empty:
             logging.info("{} FAILED with src of {} pts".format(
                 name,
@@ -197,16 +199,80 @@ def geonames():
     args = request.json
     logging.info("geonames: ({})".format(args))
 
-    cities = list(planitdb.mongo.db['GENZ2010_160'].find({
-        'properties.STATE':args['state'], 'properties.LSAD': 'city'}))
-    counties = list(planitdb.mongo.db['GENZ2010_050_20m'].find({
-        'properties.STATE':args['state'], 'properties.LSAD': 'County'}))
+    cities = sorted(
+        list(planitdb.mongo.db['GENZ2010_160'].find({
+            'properties.STATE':args['state'], 'properties.LSAD': 'city'})),
+        key=lambda x: x['properties']['NAME'])
+
+    counties = sorted(
+        list(planitdb.mongo.db['GENZ2010_050_20m'].find({
+            'properties.STATE':args['state'], 'properties.LSAD': 'County'})),
+        key=lambda x: x['properties']['NAME'])
 
     return jsonify({
         "cities": simplifyShapes(cities),
         "counties": simplifyShapes(counties)
     })
 
+@bp_planitapi.route("/sample", methods=('POST',))
+@log
+@require_key
+def sample():
+    """Population based point sampler
+
+    args:
+        state: numerical state (eg 42 = PA) [required]
+        cities: list of city GEO_IDs [optional]
+        counties: list of county GEO_IDs [optional]
+
+    returns IoT test point locations within the given geographic bounds
+    sampled by population. If no cities or unties are given, the whole
+    state is sampled.
+
+    """
+    pbs = PopulationBasedPointSampler(db=planitdb.mongo.db)
+    args = request.json
+
+    trshapes = []
+    if (len(args['cities'])> 0):
+        c = planitdb.mongo.db['GENZ2010_160'].find({
+            'properties.STATE':args['state'],
+            'properties.LSAD': 'city',
+            'properties.GEO_ID': {'$in': args['cities']}})
+        for sh in c:
+            logging.info("getting tracts for {}".format(sh['properties']))
+            trshapes += pbs.get_tract_shapes_in_area(sh)
+
+    if (len(args['counties']) > 0):
+        c = planitdb.mongo.db['GENZ2010_050'].find({
+            'properties.STATE':args['state'],
+            'properties.LSAD': 'County',
+            'properties.GEO_ID': {'$in': args['counties']}})
+        for sh in c:
+            logging.info("getting tracts for {}".format(sh['properties']))
+            trshapes += pbs.get_tract_shapes(
+                sh['properties']['STATE'],
+                sh['properties']['COUNTY'])
+    if len(trshapes) == 0:
+        # use the whole state
+        trshapes = list(pbs.get_shapes_for_state(args['state']))
+
+    logging.info("got {} tract shapes".format(len(trshapes)))
+
+    # for i, sh in enumerate(trshapes):
+    #     logging.info("tract shape {}: {}".format(i, sh['properties']))
+    result ={
+        'points': [{
+            'geometry':mapping(p),
+            'id': 'point_{}'.format(i)} for i,p in
+                enumerate(pbs.sample(args['count'], trshapes))],
+        'population': sum([t['properties']['population']['effective'] for t in trshapes])
+    }
+
+    planitdb.mongo.db.POINTS.insert(result)
+    result['pointid'] = str(result['_id'])
+    del result['_id']
+    return jsonify(result)
 
 @bp_planitapi.route('/pathloss', methods=('POST',))
 @log

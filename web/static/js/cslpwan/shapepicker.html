@@ -27,6 +27,7 @@
       ng-model="$ctrl.selectedCities" ng-change="$ctrl.selectedCitiesChange()" multiple>
       <option ng-repeat="city in $ctrl.cities" ng-value="city.properties.GEO_ID">{{city.properties.NAME}}</option>
     </select>
+
   </div>
   <div class="form-group">
     <label for="countyInput">County</label>
@@ -35,37 +36,48 @@
       <option ng-repeat="county in $ctrl.counties" ng-value="county.properties.GEO_ID">{{county.properties.NAME}}</option>
     </select>
   </div>
+
+  <button type="button" class="btn btn-default btn-sm" ng-click="$ctrl.cityCountyReset()">Reset</button>
 </form>
 </div>
 
-<ui-gmap-google-map ng-if='$ctrl.showMap'
+<ui-gmap-google-map ng-if='$ctrl.show.map'
   center='$ctrl.map.center' pan='$ctrl.map.pan'
   zoom='$ctrl.map.zoom' bounds='$ctrl.map.bounds'
   style='height: 400px'>
 
-  <ui-gmap-polygons ng-if='$ctrl.showMap'
+  <ui-gmap-polygons ng-if='$ctrl.show.selection'
     models="$ctrl.countyPolysSelected.polys"
     path="'geometry'"
-    fill="$ctrl.countyPolysSelected.fill" stroke="$ctrl.countyPolysSelected.stroke">
+    fill="$ctrl.countyPolysSelected.fill" stroke="$ctrl.countyPolysSelected.stroke"
+    events="$ctrl.polyEvents">
   </ui-gmap-polygons>
 
-  <ui-gmap-polygons ng-if='$ctrl.showMap'
+  <ui-gmap-polygons ng-if='$ctrl.show.selection'
     models="$ctrl.cityPolysSelected.polys"
     path="'geometry'"
-    fill="$ctrl.cityPolysSelected.fill" stroke="$ctrl.cityPolysSelected.stroke">
+    fill="$ctrl.cityPolysSelected.fill" stroke="$ctrl.cityPolysSelected.stroke"
+    events="$ctrl.polyEvents">
   </ui-gmap-polygons>
 
-  <ui-gmap-polygons ng-if='$ctrl.showMap'
+  <ui-gmap-polygons ng-if='$ctrl.show.unselection'
     models="$ctrl.countyPolys.polys"
     path="'geometry'"
-    fill="$ctrl.countyPolys.fill" stroke="$ctrl.countyPolys.stroke">
+    fill="$ctrl.countyPolys.fill" stroke="$ctrl.countyPolys.stroke"
+    events="$ctrl.polyEvents">
   </ui-gmap-polygons>
 
-  <ui-gmap-polygons ng-if='$ctrl.showMap'
+  <ui-gmap-polygons ng-if='$ctrl.show.unselection'
     models="$ctrl.cityPolys.polys"
     path="'geometry'"
-    fill="$ctrl.cityPolys.fill" stroke="$ctrl.cityPolys.stroke">
+    fill="$ctrl.cityPolys.fill" stroke="$ctrl.cityPolys.stroke"
+    events="$ctrl.polyEvents">
   </ui-gmap-polygons>
+
+  <ui-gmap-markers ng-if="$ctrl.show.points"
+    models="$ctrl.points" fit="true" type="spider"
+    coords="'geometry'">
+  </ui-gmap-markers>
 
   <!-- <ui-gmap-polygon ng-if='$ctrl.showMap'
     ng-repeat='poly in $ctrl.cityPolys'
@@ -79,9 +91,18 @@
 </ui-gmap-google-map>
 
 
-<div id='step3' ng-hide='$ctrl.selectedCities.length == 0 && $ctrl.selectedCounties.length == 0'>
-<div><b>Step 3, click to create the network:</b></div>
-<button type="submit" class="btn btn-default">Create network</button>
+<div id='step3' ng-hide='$ctrl.selectedCities.length == 0 && $ctrl.selectedCounties.length == 0 && $ctrl.points.length == 0'>
+<div><b>Step 3, generate sample points for the network:</b></div>
+<form class="form-inline">
+  <div class="form-group">
+    <label for="numPointsInput">Number of points: </label>
+    <select class="form-control" id="numPointsInput" name="numPointsInput"
+      ng-model="$ctrl.sampleSize" ng-options="x for x in [100,500,1000]">
+    </select>
+    <button type="submit" class="btn btn-default" ng-click="$ctrl.samplePoints()">Sample</button>
+    <button type="submit" class="btn btn-default" ng-click="$ctrl.removeSamplePoints()">Remove</button>
+  </div>
+</form>
 </div>
 <!-- <button class="btn btn-default btn-md" ng-click="$ctrl.addKey()")>Create a new key</button>
 -->
