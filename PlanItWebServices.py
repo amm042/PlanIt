@@ -10,13 +10,16 @@ import datetime
 # blueprints
 from web.login import bp_login
 from web.keyapi import bp_keyapi
+from web.planit import bp_planitv1
 from web.planitapi import bp_planitapi
+from web.cslpwan import bp_cslpwan
 from web.root import bp_root
+from web.thedocs import bp_docs
 # from web import *
 from web.data import *
 from web.decorators import *
 
-app = Flask('main')
+app = Flask('main', static_url_path='/web/static')
 app.config.update({
     'MONGO_HOST': 'eg-mongodb',
     'MONGO_PORT': 27017,
@@ -26,14 +29,17 @@ app.config.update({
 })
 # key for session
 app.config['SECRET_KEY'] = "not a very secret key."
-# app.config['EXPLAIN_TEMPLATE_LOADING'] = True
+#app.config['EXPLAIN_TEMPLATE_LOADING'] = True
 #mongo.init_app(app)
 planitdb.init_db(app)
 
 app.register_blueprint(bp_login, url_prefix='/user')
 app.register_blueprint(bp_keyapi, url_prefix='/keys')
-app.register_blueprint(bp_planitapi, url_prefix='/planit')
-app.register_blueprint(bp_root)
+app.register_blueprint(bp_cslpwan, url_prefix='/cslpwan')
+app.register_blueprint(bp_planitapi, url_prefix='/planitapi')
+app.register_blueprint(bp_planitv1, url_prefix='/planit')
+app.register_blueprint(bp_docs, url_prefix='/docs')
+app.register_blueprint(bp_root, url_prefix='')
 
 if __name__=="__main__":
 

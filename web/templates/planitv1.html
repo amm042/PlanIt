@@ -1,0 +1,39 @@
+{% extends "layout.html" %}
+
+{% block head %}
+<link rel=stylesheet type=text/css href="{{ url_for('planit.static', filename='css/planit.css') }}">
+{% endblock %}
+
+{% block body %}
+<div class="row">
+  <div class="col-md-6">
+
+
+        <input type="text" class="form-control" id="mapSearchBox" placeholder="Search map">
+
+
+  </div>
+</div>
+<div class="row margin-top-10">
+  <div class="col-md-10">
+
+    <div id="map"></div>
+  </div>
+  <div class="col-md-2">
+    list of nodes
+  </div>
+</div>
+{% endblock %}
+
+
+
+{% block scripts %}
+
+<script src="{{ url_for ('planit.static', filename='js/planit/planit.js')}}"></script>
+
+
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAq1_YAhPeiAWTI6E3BIzb2B77Zk7lUSFc&libraries=places&callback=planit.initMap"
+    async defer></script>
+
+
+{% endblock %}

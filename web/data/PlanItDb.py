@@ -82,7 +82,17 @@ class planItDb():
             )
         return self.mongo.db.keys.remove(
             {'sub': idinfo['sub'], 'signature': signature})
-    def create_key(self, idinfo, remote_addr):
+
+    def get_or_create_webkey(self, idinfo, remote_addr):
+        "look for a webkey, reutrn if found, else create one and return it"
+        curs = self.mongo.db.keys.find(
+            {'sub': idinfo['sub'], 'web': True, 'active':True},
+            {'_id': False})
+        if curs.count() > 0:
+            return curs.next()
+        return self.create_key(idinfo, remote_addr, web=True)
+
+    def create_key(self, idinfo, remote_addr, web=False):
         "create a new key for the user with idinfo (jwt)"
         keydoc = {
             'sub': idinfo['sub'],
@@ -91,6 +101,7 @@ class planItDb():
             'use_info': {'use_count': 0,
                         'remotes': [remote_addr]},
             'active': True,
+            'web': web,
             'signature': [0*64] # dummy data
         }
         self.mongo.db.keys.insert(keydoc)

@@ -2,12 +2,15 @@ from flask import Blueprint, session, render_template
 import logging
 from .decorators import *
 
-bp_root = Blueprint('root', __name__, static_folder='static',
+bp_root = Blueprint('root', __name__,
+    static_folder='static',
     template_folder ='templates')
 
 applications = [
-    {'name': 'PlanIt', 'func': 'planitapi.index'},
-    {'name': 'Docs', 'func': 'thedoc.index'},
+    {'name': 'PlanIt - Crowdsourced Network Planner', 'func': 'cslpwan.index'},
+    {'name': 'PlanIt - Manual Network Planner', 'func': 'planit.index'},
+    {'name': 'PlanIt - Web Service API', 'func': 'planitapi.index'},
+    {'name': 'Docs', 'func': 'thedocs.index'},
     {'name': 'API key manager', 'func': 'keyapi.index'}
 ]
 services = [
@@ -21,5 +24,5 @@ def index():
     if 'logged_in' in session and session['logged_in'] == True and 'token' not in session:
         session.clear()
 
-    return render_template('root/index.html', user=session.get('token'),
+    return render_template('root.html', user=session.get('token'),
         services=services, applications=applications)

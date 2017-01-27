@@ -32,6 +32,13 @@ def create_key():
     planitdb.create_key(session['token'], request.remote_addr)
     return jsonify({"result": "success", "keys": planitdb.list_keys(session['token'])})
 
+@bp_keyapi.route('/get_webkey', methods=['POST'])
+@log
+@require_login
+def get_webkey():
+    planitdb.get_or_create_webkey(session['token'], request.remote_addr)
+    return jsonify({"result": "success", "keys": planitdb.list_keys(session['token'])})
+
 @bp_keyapi.route('/enable_key', methods=['POST'])
 @log
 @require_login

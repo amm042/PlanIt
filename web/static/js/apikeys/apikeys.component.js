@@ -84,7 +84,7 @@ angular.module("ApiKeysApp")
 
           if (keys[i].use_info.last_used){
             var d = new Date(keys[i].use_info.last_used.$date);
-            keys[i].use_info.last_used = d.toString();          
+            keys[i].use_info.last_used = d.toString();
           }else{
             keys[i].use_info.last_used = '-'
           }

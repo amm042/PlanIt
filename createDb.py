@@ -9,7 +9,19 @@ from pprint import pprint
 #import struct
 import traceback
 
-importCensusData = True
+importCensusData = False
+import20m = True
+if import20m:
+	db = pymongo.MongoClient('mongodb://owner:1M$t5iOqXzWMw&aM@eg-mongodb.bucknell.edu/planit').get_default_database()
+	col = db['GENZ2010_050_20m']
+	col.create_index([("geometry", pymongo.GEOSPHERE)])
+
+	for shfile in glob.glob('GENZ2010/gz_2010_us_050_00_20m.shp'):
+		print("Reading: {}".format(shfile))
+		with fiona.open(shfile) as fc:
+			for shp in fc:
+				col.insert_one(shp)
+				print(".", end="")
 
 
 if 0:

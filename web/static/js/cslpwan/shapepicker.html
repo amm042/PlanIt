@@ -1,0 +1,87 @@
+<div class="loading-spinner-holder">
+  <div class="loading-spinner" ng-show="$ctrl.busy"><img src='static/img/ajax-loader.gif'/></div>
+  <div class="loading-spinner" ng-hide="$ctrl.busy"><img src='static/img/ajax-transparent.gif'/></div>
+</div>
+
+<h3>Point Selection</h3>
+
+<div id='step1'>
+<form class="form">
+  <div class="form-group">
+    <label for="stateInput">Step 1, select a state:</label>
+    <select required class="form-control" id="stateInput"
+        ng-model="$ctrl.selectedState"
+        ng-change="$ctrl.selectedStateChange()">
+      <option ng-repeat="(stnum, data) in $ctrl.states" value="{{stnum}}">{{data.name}}</option>
+    </select>
+  </div>
+</form>
+</div>
+
+<div id='step2' ng-hide='($ctrl.cities.length == 0 && $ctrl.counties.length == 0)'>
+<form class="form-inline">
+  <div><b>Step 2, select cities and/or counties:</b></div>
+  <div class="form-group">
+    <label for="cityInput">City</label>
+    <select class="form-control" id="cityInput" name="cityInput" style="height: 20%"
+      ng-model="$ctrl.selectedCities" ng-change="$ctrl.selectedCitiesChange()" multiple>
+      <option ng-repeat="city in $ctrl.cities" ng-value="city.properties.GEO_ID">{{city.properties.NAME}}</option>
+    </select>
+  </div>
+  <div class="form-group">
+    <label for="countyInput">County</label>
+    <select multiple class="form-control" id="countyInput" name="countyInput" style="height: 20%"
+      ng-model="$ctrl.selectedCounties" ng-change="$ctrl.selectedCountiesChange()">
+      <option ng-repeat="county in $ctrl.counties" ng-value="county.properties.GEO_ID">{{county.properties.NAME}}</option>
+    </select>
+  </div>
+</form>
+</div>
+
+<ui-gmap-google-map ng-if='$ctrl.showMap'
+  center='$ctrl.map.center' pan='$ctrl.map.pan'
+  zoom='$ctrl.map.zoom' bounds='$ctrl.map.bounds'
+  style='height: 400px'>
+
+  <ui-gmap-polygons ng-if='$ctrl.showMap'
+    models="$ctrl.countyPolysSelected.polys"
+    path="'geometry'"
+    fill="$ctrl.countyPolysSelected.fill" stroke="$ctrl.countyPolysSelected.stroke">
+  </ui-gmap-polygons>
+
+  <ui-gmap-polygons ng-if='$ctrl.showMap'
+    models="$ctrl.cityPolysSelected.polys"
+    path="'geometry'"
+    fill="$ctrl.cityPolysSelected.fill" stroke="$ctrl.cityPolysSelected.stroke">
+  </ui-gmap-polygons>
+
+  <ui-gmap-polygons ng-if='$ctrl.showMap'
+    models="$ctrl.countyPolys.polys"
+    path="'geometry'"
+    fill="$ctrl.countyPolys.fill" stroke="$ctrl.countyPolys.stroke">
+  </ui-gmap-polygons>
+
+  <ui-gmap-polygons ng-if='$ctrl.showMap'
+    models="$ctrl.cityPolys.polys"
+    path="'geometry'"
+    fill="$ctrl.cityPolys.fill" stroke="$ctrl.cityPolys.stroke">
+  </ui-gmap-polygons>
+
+  <!-- <ui-gmap-polygon ng-if='$ctrl.showMap'
+    ng-repeat='poly in $ctrl.cityPolys'
+    path="poly"
+    fill="$ctrl.cityPolyFill" stroke="$ctrl.cityPolyStroke">
+
+  <ui-gmap-polygon ng-if='$ctrl.showMap'
+    ng-repeat='cpoly in $ctrl.countyPolys'
+    path="cpoly"
+    fill="$ctrl.countyPolyFill" stroke="$ctrl.countyPolyStroke"> -->
+</ui-gmap-google-map>
+
+
+<div id='step3' ng-hide='$ctrl.selectedCities.length == 0 && $ctrl.selectedCounties.length == 0'>
+<div><b>Step 3, click to create the network:</b></div>
+<button type="submit" class="btn btn-default">Create network</button>
+</div>
+<!-- <button class="btn btn-default btn-md" ng-click="$ctrl.addKey()")>Create a new key</button>
+-->

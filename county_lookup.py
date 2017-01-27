@@ -3252,7 +3252,7 @@ for row in _c:
 
 def state_num(state_abbrev):
 	return _state_by_abbrev[state_abbrev]
-	
+
 def state_name(state_code):
 	return _states[state_code]
 
@@ -3260,7 +3260,9 @@ def county_name(state_code, county_code):
 	return _counties[state_code + county_code]
 
 if __name__ == "__main__":
-	print(states['42'])
-	print(counties['42119'])
-	assert (states['42']=='PA')
-	assert (counties['42119'] == 'Union County')
+	#print(_states['42'])
+	#print(_counties['42119'])
+	assert (_states['42']=='PA')
+	assert (_counties['42119'] == 'Union County')
+	import pprint
+	pprint.pprint(_states)
