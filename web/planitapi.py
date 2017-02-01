@@ -1,15 +1,19 @@
-from flask import Blueprint, session, request, g, Response, url_for
+from flask import Blueprint, session, request, g, Response, url_for, current_app
 import logging
 
 from .data import *
 from .decorators import *
+
+
+import matplotlib
+matplotlib.use('pdf')
 
 from elevation import Elevation
 from geopath import GeoPath
 
 from itwom import ItwomParams, itwomParams_average, loss_along_path
 
-from bson import json_util
+from bson import json_util, ObjectId
 
 import gevent
 from multiprocessing import Process, Queue
@@ -21,10 +25,13 @@ import time
 
 from shapely.geometry import mapping, shape, Point, Polygon, MultiPolygon
 
+import os
 
 from .utils.pointSampler import PopulationBasedPointSampler
+from .utils.processSamplePoints import AnalyzePoints
+from .utils.plotPointResults import PlotCoverage, PlotLoss
 
-SRTM_PATH="../SRTM_RAW"
+SRTM_PATH=os.path.join(os.getcwd(),"../SRTM_RAW")
 elev = Elevation(srtm_path=SRTM_PATH, mongo_str= None)
 bp_planitapi = Blueprint('planitapi', __name__,
     template_folder ='templates',
@@ -213,6 +220,73 @@ def geonames():
         "cities": simplifyShapes(cities),
         "counties": simplifyShapes(counties)
     })
+@bp_planitapi.route("/analyze", methods=('POST',))
+@log
+@require_key
+def analyze():
+    """CSLPWAN network analizer
+
+    args:
+        pointid: object id of point set to use [required]
+        numBase: number of base stations (array) [required]
+        numRuns: number of simulation runs (int) [required]
+        freq: frequency MHz (float) [required]
+        txHeight: transmitter height agl meters [required]
+        rxHeight: transmitter reciever agl meters [required]
+        model: itwom model 'city' or 'average' [required]
+        lossThreshold: radio loss threshold (float) [required]
+        key: api key [required]
+
+    todo: make this async.
+    """
+
+    args = request.json
+    logging.info("analyze args: {}".format(args))
+
+    #check if we have results from a previous run
+    cache = {'args': args}
+    curs = planitdb.mongo.db['RUNCACHE'].find({'args': args})
+    if curs.count() > 0:
+        logging.info("Cache hit, returning cached results.")
+        cache = curs.next()
+    else:
+        planitdb.mongo.db['RUNCACHE'].insert(cache)
+
+    if 'loss' not in cache or 'coverage' not in cache:
+        # save result set in database, pass object id of results
+        # and links to plot images back to web service
+        mstr = "mongodb://{}:{}@{}:{}/{}".format(
+            current_app.config.get('MONGO_USERNAME'),
+            current_app.config.get('MONGO_PASSWORD'),
+            current_app.config.get('MONGO_HOST'),
+            current_app.config.get('MONGO_PORT'),
+            current_app.config.get('MONGO_DBNAME'))
+        rdocs = AnalyzePoints(dbcon = planitdb.mongo.db,
+            connect_str = mstr,
+            srtm_path=SRTM_PATH, **args)
+
+        ## generate plots of results
+        logging.info("static path is {}".format(
+            os.path.join(os.getcwd(), 'static')))
+
+        coverage = PlotCoverage(rdocs, os.path.join(os.getcwd(),
+            os.path.join('static/results/coverage')), str(cache['_id']))
+
+        loss = PlotLoss(rdocs, args['lossThreshold'], os.path.join(os.getcwd(),
+            os.path.join('static/results/loss')), str(cache['_id']))
+
+        cache['coverage'] = coverage
+        cache['loss'] = loss
+        planitdb.mongo.db['RUNCACHE'].update(
+            {'_id': cache['_id']}, cache)
+
+    result = {'args': args,
+        'loss': url_for('static',
+            filename='results/loss/'+os.path.basename(cache['loss'])),
+        'coverage': url_for('static',
+            filename='results/coverage/'+os.path.basename(cache['coverage'])),
+            }
+    return jsonify(result)
 
 @bp_planitapi.route("/sample", methods=('POST',))
 @log
@@ -221,6 +295,7 @@ def sample():
     """Population based point sampler
 
     args:
+        pointid: object id of previous return set [optional]
         state: numerical state (eg 42 = PA) [required]
         cities: list of city GEO_IDs [optional]
         counties: list of county GEO_IDs [optional]
@@ -229,49 +304,74 @@ def sample():
     sampled by population. If no cities or unties are given, the whole
     state is sampled.
 
-    """
-    pbs = PopulationBasedPointSampler(db=planitdb.mongo.db)
-    args = request.json
+    todo: make this async.
 
+    """
+
+    args = request.json
+    logging.info("sample args: {}".format(args))
+
+    if 'pointid' in args:
+        cur = planitdb.mongo.db.POINTS.find({'_id': ObjectId(args['pointid'])})
+        if cur.count() > 0:
+            logging.info("got points from DB.")
+            result = cur.next()
+            result['pointid'] = str(result['_id'])
+            del result['_id']
+            del result['args']
+            return jsonify(result)
+
+    pbs = PopulationBasedPointSampler(db=planitdb.mongo.db)
     trshapes = []
+    name = args['state']
     if (len(args['cities'])> 0):
+
         c = planitdb.mongo.db['GENZ2010_160'].find({
             'properties.STATE':args['state'],
             'properties.LSAD': 'city',
             'properties.GEO_ID': {'$in': args['cities']}})
         for sh in c:
+            name += "-" + sh['properties']['NAME']
             logging.info("getting tracts for {}".format(sh['properties']))
             trshapes += pbs.get_tract_shapes_in_area(sh)
 
     if (len(args['counties']) > 0):
+
         c = planitdb.mongo.db['GENZ2010_050'].find({
             'properties.STATE':args['state'],
             'properties.LSAD': 'County',
             'properties.GEO_ID': {'$in': args['counties']}})
         for sh in c:
+            name += "." + sh['properties']['NAME']
             logging.info("getting tracts for {}".format(sh['properties']))
             trshapes += pbs.get_tract_shapes(
                 sh['properties']['STATE'],
                 sh['properties']['COUNTY'])
+
     if len(trshapes) == 0:
         # use the whole state
         trshapes = list(pbs.get_shapes_for_state(args['state']))
 
-    logging.info("got {} tract shapes".format(len(trshapes)))
+    logging.info("got {} tract shapes for {}".format(len(trshapes), name))
 
-    # for i, sh in enumerate(trshapes):
-    #     logging.info("tract shape {}: {}".format(i, sh['properties']))
+    for i, sh in enumerate(trshapes):
+        logging.info("tract shape {}: {}".format(i, sh['properties']))
     result ={
+        'args': args,
+        'name': name,
+        'state': args['state'],
         'points': [{
             'geometry':mapping(p),
             'id': 'point_{}'.format(i)} for i,p in
                 enumerate(pbs.sample(args['count'], trshapes))],
-        'population': sum([t['properties']['population']['effective'] for t in trshapes])
+        'population': sum([t['properties']['population']['effective'] for t in trshapes]),
+        'area': sum(t['properties']['area']['effective'] for t in trshapes)
     }
 
     planitdb.mongo.db.POINTS.insert(result)
     result['pointid'] = str(result['_id'])
     del result['_id']
+    del result['args']
     return jsonify(result)
 
 @bp_planitapi.route('/pathloss', methods=('POST',))

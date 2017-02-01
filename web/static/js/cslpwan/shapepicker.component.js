@@ -102,7 +102,14 @@ angular.module("cslpwanApp")
         me.map = { center:{ latitude: 45, longitude: -73 }, bounds: {},
           zoom: 7, pan: true };
         me.sampleSize = 500;
+        me.numBase = [1];
+        me.numRuns = 2;
         me.points = [];
+        me.freqMhz = 900.0;
+        me.lossThreshold = 148;
+        me.txHeight = 5;
+        me.rxHeight = 1;
+        me.itwomModel = 'city';
         $("#numPointsInput").val = me.sampleSize.toString();
         console.log(  $("#numPointsInput").val() );
         me.countyPolysSelected ={
@@ -188,8 +195,13 @@ angular.module("cslpwanApp")
         if (me.selectedCounties.length > 0)
           me.selectedCountiesChange();
 
-        me.busy = false
+        if('pointid' in s){
+          me.samplePoints();
+        }
 
+        if ($http.pendingRequests.length == 0){
+          me.busy = false;
+        }
       } //$onInit
 
       me.selectedStateChange = function () {
@@ -213,12 +225,8 @@ angular.module("cslpwanApp")
         me.selectedCities = [];
         me.selectedCounties = [];
 
-        if ($location.search().state != me.selectedState){
-          $location.search({state: me.selectedState,
-                            cities: me.selectedCities.toString(),
-                            counties: me.selectedCounties.toString()});
-          console.log($location);
-        }
+        $location.search('state', me.selectedState);
+
 
         me.busy = true;
         // = 'static/img/ajax-loader.gif';
@@ -265,9 +273,8 @@ angular.module("cslpwanApp")
             }
           }
         }
-        $location.search({state: me.selectedState,
-                          cities: me.selectedCities.toString(),
-                          counties: me.selectedCounties.toString()});
+        $location.search('cities', me.selectedCities.toString());
+
       } // selectedCitiesChange
       me.selectedCountiesChange = function(){
         me.countyPolysSelected.polys = [];
@@ -278,21 +285,24 @@ angular.module("cslpwanApp")
             }
           }
         }
-        $location.search({state: me.selectedState,
-                          cities: me.selectedCities.toString(),
-                          counties: me.selectedCounties.toString()});
+        $location.search('counties', me.selectedCounties.toString());
       }
       me.removeSamplePoints = function(){
         me.show.unselection=true;
         me.show.selection = true;
         me.show.points = false;
         me.points = [];
+
+        $location.search('pointid', null);
+
       }
       me.samplePoints = function (){
         console.log('sampling ' + me.sampleSize + ' points.');
-
+        console.log("search is");
+        console.log($location.search());
         me.busy = true
         $http.post(me.apiprefix + 'sample', {
+            pointid: $location.search().pointid,
             count: me.sampleSize,
             state: me.selectedState,
             cities: me.selectedCities,
@@ -308,18 +318,42 @@ angular.module("cslpwanApp")
             console.log("point id is " + response.data.pointid.toString());
             me.points = response.data.points;
             me.show.points = true;
-            var s= $location.search();
-            s.pointid = response.data.pointid.toString();
-            $location.search (s);
+
+            $location.search('pointid', response.data.pointid.toString());
 
           }, function fail(response){
-            me.busy = false
+            me.busy = false;
             console.log("FAIL");
             console.log(response);
           });
 
       } // sample points
+      me.analyze = function(){
+        me.busy = true;
+        $http.post(me.apiprefix + 'analyze', {
+          key: me.key,
+          freq: me.freqMhz,
+          model: me.itwomModel,
+          numBase: me.numBase,
+          numRuns: me.numRuns,
+          lossThreshold: me.lossThreshold,
+          txHeight: me.txHeight,
+          rxHeight: me.rxHeight,
+          model: me.itwomModel,
+          pointid: $location.search().pointid
+        }).then(function success(response){
+          me.busy = false
+          console.log("analyze success response");
+          console.log(response);
+          me.coverage = response.data.coverage
+          me.loss = response.data.loss
+        }, function fail(response){
+          me.busy = false
+          console.log("FAIL");
+          console.log(response);
+        });
 
+      } //analyze
 
     }] // controller
 

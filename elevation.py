@@ -17,6 +17,9 @@ import time
 import zipfile
 
 import multiprocessing
+import logging
+
+log = logging.getLogger("__name__")
 
 locker = multiprocessing.Lock()
 cache = {}
@@ -121,7 +124,7 @@ class Elevation():
 						with zipfile.ZipFile(os.path.join(self.zip_path, ziptile)) as zf:
 
 							for zipcontent in zf.namelist():
-								print("unzipping {} --> {}".format(
+								logging.info("unzipping {} --> {}".format(
 									os.path.join(self.zip_path, ziptile),
 									os.path.join(self.srtm_path, zipcontent)))
 
@@ -131,25 +134,25 @@ class Elevation():
 
 					else:
 
-						print("need tile: {} from gridfs".format(tile))
-						
+						logging.info("need tile: {} from gridfs".format(tile))
+
 						if self.gfs == None:
 							raise Exception("Could not load tile at {}".format(local_tilefile))
-							
+
 						else:
 							fp = self.gfs.find_one({'filename':tile})
 							if fp == None:
-								print("Warning tile {} not found on gridfs, assuming sea level (zeros)".format(tile))
+								logging.info("Warning tile {} not found on gridfs, assuming sea level (zeros)".format(tile))
 								import time
 								time.sleep(3)
 							else:
-								print("getting {} bytes from {} to {}.".format(fp.length, fp, local_tilefile))
+								logging.info("getting {} bytes from {} to {}.".format(fp.length, fp, local_tilefile))
 								with open(local_tilefile, 'wb') as lfp:
 									lfp.write(fp.read())
 
 				if os.path.exists(local_tilefile):
 					# load from disk to memory cache
-					print("loading tile: {}".format(local_tilefile))
+					logging.info("loading tile: {}".format(local_tilefile))
 					d = gdal.Open(local_tilefile, gdalconst.GA_ReadOnly)
 					r1 = d.GetRasterBand(1)
 					cache[tile] = {
@@ -181,7 +184,7 @@ class Elevation():
 			return float(cache[tile]['raster'][row][col])
 		finally:
 			locker.release()
-			
+
 
 if __name__ == "__main__":
 

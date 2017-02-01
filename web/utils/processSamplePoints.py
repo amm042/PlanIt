@@ -17,6 +17,8 @@ from descartes import PolygonPatch
 from shapely.geometry import shape, mapping
 from county_lookup import state_name, county_name
 
+from elevation import Elevation
+
 import pymongo
 
 from pykml.factory import KML_ElementMaker as KML
@@ -28,9 +30,11 @@ import random
 
 from bson import ObjectId
 
-from multiprocessing import Process
+from multiprocessing import Process, Queue
+
 #from threading import Thread
 import logging
+import os
 
 log = logging.getLogger(__name__)
 
@@ -136,25 +140,30 @@ def plot_shapes(ax, shapes, filled = False, show_states = False, fc=None, alpha=
 		for p in patches:
 			ax.add_patch(p)
 
-def evaluate_points(num_base, loss_threshold, pointdoc,
+def evaluate_points(q, num_base, loss_threshold, pointdoc,
 	tx_height, rx_height,
-	itwomparam,
-	connection = None,
-	conn_str = 'mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015'):
+	run_id, itwomparam,
+	conn_str = 'mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015',
+	srtm_path = None):
 	"called from multiprocessing"
 
+	pid = os.getpid()
 	# to save our results.
-	if connection == None:
-		connection = pymongo.MongoClient(conn_str)
+	logging.info("{} connecting to {}".format(pid, conn_str))
+	connection = pymongo.MongoClient(conn_str)
 	db = connection.get_default_database()
 
-	logging.info("evaluating points for {} bs (tx {} rx {}) -- {} points".format(
-			num_base, tx_height, rx_height, len(pointdoc)))
+	elev = Elevation(srtm_path=srtm_path, mongo_str= None)
 
-	# should be 100 point docs.
+	logging.info("{} evaluating points for {} bs (tx {} rx {}) -- {} points".format(
+			pid, num_base, tx_height, rx_height, len(pointdoc)))
+
 	for d in pointdoc:
 		olddocs = db['POINTRESULTS'].find({
+						'name': d['name'],
 						'point_docid': d['_id'],
+						'run': run_id,
+						'itwomparam': itwomparam.__dict__,
 						'num_basestations': num_base,
 						'tx_height': tx_height,
 						'rx_height': rx_height},
@@ -168,12 +177,18 @@ def evaluate_points(num_base, loss_threshold, pointdoc,
 			continue
 		if dc == 1:
 			logging.info("{} ({} bs) - {} done already".format(d['name'], num_base, d['_id']))
+			for doc in olddocs:
+				q.put(doc)
 			continue
 
-		logging.info("processing points for {} ({} bs) (tx {} rx {}) -- {} points".format(
-			d['name'], num_base, tx_height, rx_height, len(pointdoc)))
+		logging.info("{} processing points for {} ({} bs) (tx {} rx {}) -- {} points".format(
+			pid, d['name'], num_base, tx_height, rx_height, len(pointdoc)))
 		# select base station point(s)
 		basestations = random.sample(d['points'], num_base)
+
+		# for b in basestations:
+		# 	if 'coordinates' not in b:
+		# 		b['coordinates'] = shape(b['geometry']).coords[0]
 
 		resultdoc = {
 			'name': d['name'],
@@ -181,10 +196,11 @@ def evaluate_points(num_base, loss_threshold, pointdoc,
 			'area': d['area'],
 			'population': d['population'],
 			'point_docid': d['_id'],
+			'run': run_id,
 			'loss_threshold': loss_threshold,
 			'num_basestations': num_base,
 			'num_points': len(d['points']),
-			'loss_model': 'city',
+			'itwomparam': itwomparam.__dict__,
 			'nodes': [],
 			'basestations': basestations,
 			'gentime': datetime.datetime.utcnow(),
@@ -206,15 +222,20 @@ def evaluate_points(num_base, loss_threshold, pointdoc,
 				#print("{} is a basestation".format(p))
 				continue
 			else:
+				# if 'coordinates' not in p:
+				# 	p['coordinates'] = shape(p['geometry']).coords[0]
+					# logging.info("added coordinates: {}".format(p['coordinates']))
 				#compute loss to all basestations, and save the lowest loss path
 				l = [point_loss(
-					(b['coordinates'][0], b['coordinates'][1]), tx_height,
-					(p['coordinates'][0], p['coordinates'][1]), rx_height,
-					params=itwomparam) for b in basestations]
+					(b['geometry']['coordinates'][0], b['geometry']['coordinates'][1]), tx_height,
+					(p['geometry']['coordinates'][0], p['geometry']['coordinates'][1]), rx_height,
+					params=itwomparam, elev=elev)[0] for b in basestations]
 
 				min_loss = min(l)
 				loss.append(min_loss)
-
+				# logging.info("min loss is: {}, threshold is: {}".format(
+				# 	min_loss, loss_threshold
+				# ))
 				if min_loss < loss_threshold:
 					connected += 1
 				else:
@@ -225,35 +246,63 @@ def evaluate_points(num_base, loss_threshold, pointdoc,
 		resultdoc['connected'] = connected / (connected+disconnected)
 
 		db['POINTRESULTS'].insert_one(resultdoc)
+		q.put(resultdoc)
+	logging.info("{} finished, close db.".format(pid))
+	connection.close()
+	logging.info("{} done.".format(pid))
 
-def AnalyzePoints(dbcon, pointid, numBase = [1], numRuns = 1,
+def AnalyzePoints(dbcon, connect_str, srtm_path, pointid, numBase = [1], numRuns = 1,
 	freq = 915.0, txHeight=5, rxHeight=1, model='city',
 	lossThreshold = 148):
 
-	jobs = []
 
-	pointdocs = dbcon.db['POINTS'].find({"_id": ObjectId(pointid)})
-	logging.info("getting point data...")
+
+	pointdocs = dbcon['POINTS'].find({"_id": ObjectId(pointid)})
+	logging.info("getting {} point data docs for {}...".format(
+		pointdocs.count(),
+		pointid))
 	r = list(pointdocs)
 	logging.info("Done.")
 
 	jobres = {}
 
+	#logging.info(dir(dbcon))
+
 	itwomparam = itwomParams_average()
 	if model == 'city':
 		itwomparam = itwomParams_city()
+	itwomparam.freq_mhz = freq
 
-	for num_base in numBase:
-		j = Process(target=evaluate_points,
-				args=(num_base, lossThreshold, r, txHeight, rxHeight, itwomparam, dbcon),
-				name="{} {} basestations".format(pointid, num_base))
-		jobs.append(j)
-		j.start()
+	q = Queue()
+	jobs = []
+	pcount = 0
+	for run_id in range(int(numRuns)):
+		for num_base in numBase:
+			# while len(jobs) > 8:
+			# 	logging.info("waiting for: {}".format(jobs[0].name))
+			# 	jobs[0].join()
+			# 	logging.info("{} done.".format(jobs[0].name))
+			# 	del jobs[0]
+			pcount += 1
+			j = Process(target=evaluate_points,
+					args=(q, num_base, lossThreshold, r,
+						txHeight, rxHeight,
+						run_id, itwomparam, connect_str, srtm_path),
+					name="{} {} basestations".format(pointid, num_base))
+			j.start()
+			jobs.append(j)
+
+	# must consume all results from the queue before joining the process.
+	res = []
+	while len(res) < pcount:
+		res.append(q.get())
 
 	for j in jobs:
+		logging.info("wait for {}, {}.".format(j.pid, j.name))
 		j.join()
-		print("{} done.".format(j.name))
+		logging.info("{}, {} done.".format(j.pid, j.name))
 
+	return res
 
 if __name__=="__main__":
 

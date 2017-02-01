@@ -21,10 +21,10 @@ class ItwomParams():
 		for k,v in kwargs.items():
 			setattr(self,k,v)
 
-def itwomParams_city():
-	return ItwomParams(eps_dielect = 5, sgm_conductivity = 0.001)
-def itwomParams_average():
-	return ItwomParams(eps_dielect = 15, sgm_conductivity = 0.005)
+def itwomParams_city(freq_mhz = 900):
+	return ItwomParams(freq_mhz = freq_mhz, eps_dielect = 5, sgm_conductivity = 0.001)
+def itwomParams_average(freq_mhz = 900):
+	return ItwomParams(freq_mhz = freq_mhz, eps_dielect = 15, sgm_conductivity = 0.005)
 
 def point_loss(	tx_latlon, tx_height,
 				rx_latlon, rx_height,

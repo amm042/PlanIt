@@ -20,6 +20,8 @@ from pprint import pprint
 import os.path
 import random
 
+from bson import ObjectId
+
 def plot_contours(area, points, fig, ax, plot_legend= True, plot_points= True):
 
 	geod = Geod(ellps='WGS84')
@@ -121,68 +123,75 @@ def plot_shapes(ax, shapes, filled = False, show_states = False):
 		for p in patches:
 			ax.add_patch(p)
 
-def PlotCoverage(db, out_path):
+def PlotLoss(resdocs, threshold, out_path, fname):
+	if not os.path.exists(out_path):
+		os.makedirs(out_path)
+	outputfile = os.path.join(out_path, fname + ".pdf")
+	if os.path.exists(outputfile):
+		logging.info("Skip loss {} exists".format(outputfile))
+		return outputfile
 
+	loss = {}
+	for doc in resdocs:
+		if doc['num_basestations'] in loss:
+			loss[doc['num_basestations']] += [x['min_loss'] for x in doc['nodes']]
+		else:
+			loss[doc['num_basestations']] = [x['min_loss'] for x in doc['nodes']]
 
+	fig = plt.figure(figsize = (8,8))
+	ax = plt.subplot(111)
+	kys = sorted(loss.keys())
+	ax.violinplot(
+		[loss[k] for k in kys],
+		kys,
+		showmeans=False, showmedians=True)
+	ax.plot( (kys[0]-1, kys[-1]+1), (threshold, threshold),
+		'--', lw=2, color='blue')
+	#ax.set_title(cityname)
+	ax.set_ylabel("Loss (dBm)")
+	ax.set_xlabel("Number of basestations")
 
-	for cityname in ['Potter']:
-		# if cityname in ["Shamokin", "Uniontown", "Bethlehem", "Bradford", "Chester", "Clairton",
-		# "Coatesville", "Connellsville", "DuBois", "Duquesne", "Easton", "Erie", "Aliquippa", "Allentown", "Altoona",
-		# "Beaver Falls", "Farrell", "Arnold", "Franklin", "Jeannette", "Johnstown", "Lebanon", "Lock Haven",
-		# "Lower Burrell", "Latrobe", "Greensburg", "Harrisburg", "Hazleton", "Hermitage", "McKeesport", "Meadville",
-		# "Monongahela", "Pittsburgh", "Pittston", "Oil City", "Reading", "Pottsville", "Sunbury", "Titusville",
-		# "St. Marys", "Scranton", "Warren", "Washington", "Wilkes-Barre", "Williamsport", "York", "Nanticoke",
-		# "New Castle", "New Kensington", "Sharon"]:
+	#ax.set_ylim((0.8, 1))
+	ax.axis('tight')
 
-			outputfile = "figures/"+cityname+"_coverage.pdf"
+	plt.savefig(outputfile, dpi=300)
+	return outputfile
 
-			#if os.path.exists(outputfile):
-			#	print("Skip {}, {} exists".format(cityname, outputfile))
-			#	continue
+def PlotCoverage(resdocs, out_path, fname):
+	if not os.path.exists(out_path):
+		os.makedirs(out_path)
+	outputfile = os.path.join(out_path, fname + ".pdf")
 
-			print("processing {}".format(cityname))
+	if os.path.exists(outputfile):
+		logging.info("Skip coverage {} exists".format(outputfile))
+		return outputfile
 
-			basestations = db['POINTRESULTS'].find({'name': cityname, 'tx_height': 5, 'rx_height': 1}).distinct('num_basestations')
+	coverage_rate = {}
 
-			coverage_rate = {}
-			for b in basestations:
-				res = db['POINTRESULTS'].find({'name': cityname, 'tx_height': 5, 'rx_height': 1, 'num_basestations': b})
+	for doc in resdocs:
+		if doc['num_basestations'] in coverage_rate:
+			coverage_rate[doc['num_basestations']].append(doc['connected'])
+		else:
+			coverage_rate[doc['num_basestations']] = [doc['connected']]
 
-				for result in res:
-					print("{} ({}) has coverage {} with {} basestation(s)".format(
-						result['_id'],
-						cityname,
-						result['connected'],
-						b))
-					if b in coverage_rate:
-						coverage_rate[b].append(result['connected'])
-					else:
-						coverage_rate[b] = [result['connected']]
+	fig = plt.figure(figsize = (8,8))
+	ax = plt.subplot(111)
+	kys = sorted(coverage_rate.keys())
+	ax.violinplot(
+		[coverage_rate[k] for k in kys],
+		kys,
+		showmeans=False, showmedians=True)
 
-			# pprint (coverage_rate)
-			# print("vals = ", end="")
-			# pprint(list(coverage_rate.values()))
-			# print("keys = ", end="")
-			# pprint(coverage_rate.keys())
+	#ax.set_title(cityname)
+	ax.set_ylabel("Connected (rate)")
+	ax.set_xlabel("Number of basestations")
 
+	#ax.set_ylim((0.8, 1))
+	ax.axis('tight')
 
-			fig = plt.figure(figsize = (8,8))
-			ax = plt.subplot(111)
-			kys = sorted(coverage_rate.keys())
-			ax.violinplot(
-				[coverage_rate[k] for k in kys],
-				kys,
-				showmeans=False, showmedians=True)
+	plt.savefig(outputfile, dpi=300)
+	return outputfile
 
-			ax.set_title(cityname)
-			ax.set_ylabel("Connected (rate)")
-			ax.set_xlabel("Number of basestations")
-
-			#ax.set_ylim((0.8, 1))
-			ax.axis('tight')
-
-			#plt.show()
-			plt.savefig("figures/"+cityname+"_coverage.pdf", dpi=300)
 if __name__ == "__main__":
 
 
