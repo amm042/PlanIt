@@ -15,7 +15,6 @@ from county_lookup import state_name, county_name
 
 import pymongo
 
-from pykml.factory import KML_ElementMaker as KML
 from lxml import etree
 import datetime
 from pprint import pprint
