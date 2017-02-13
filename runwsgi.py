@@ -13,14 +13,16 @@ import sys
 # blueprints
 from web.login import bp_login
 from web.keyapi import bp_keyapi
+from web.planit import bp_planitv1
 from web.planitapi import bp_planitapi
+from web.cslpwan import bp_cslpwan
 from web.root import bp_root
-from web.thedocs import bp_doc
+from web.thedocs import bp_docs
+# from web import *
+from web.data import *
+from web.decorators import *
 
-# data layer
-from web.data import planitdb
-
-# patch for gevent cooperative tasking 
+# patch for gevent cooperative tasking
 monkey.patch_all()
 
 logfile = os.path.splitext(sys.argv[0])[0] + ".log"
@@ -51,11 +53,13 @@ app.config['EXPLAIN_TEMPLATE_LOADING'] = False
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 planitdb.init_db(app)
 
-app.register_blueprint(bp_login, url_prefix='/planit/user')
-app.register_blueprint(bp_keyapi, url_prefix='/planit/keys')
-app.register_blueprint(bp_planitapi, url_prefix='/planit/api')
-app.register_blueprint(bp_root, url_prefix='/planit')
-app.register_blueprint(bp_doc, url_prefix='/planit/doc')
+app.register_blueprint(bp_login, url_prefix='/user')
+app.register_blueprint(bp_keyapi, url_prefix='/keys')
+app.register_blueprint(bp_cslpwan, url_prefix='/cslpwan')
+app.register_blueprint(bp_planitapi, url_prefix='/planitapi')
+app.register_blueprint(bp_planitv1, url_prefix='/planit')
+app.register_blueprint(bp_docs, url_prefix='/docs')
+app.register_blueprint(bp_root, url_prefix='')
 
 # @app.errorhandler(404)
 # def page_not_found(error):
@@ -66,17 +70,17 @@ app.register_blueprint(bp_doc, url_prefix='/planit/doc')
 @app.before_request
 def redirect_eg():
     u = urlparse(request.url)
-    
+
     # don't redirect static content to https
     # possibel security risk by appending static to a non-static url??
     if '/static/' in u.path:
         return None
 
     # already https
-    if u.netloc == 'www.eg.bucknell.edu':# and request.is_secure:        
+    if u.netloc == 'www.eg.bucknell.edu':# and request.is_secure:
         # logging.info("NO redirect {}".format(request.url))
         return None
-    
+
     # redirect everything else
     # logging.info(str(u))
     # logging.info(request.headers)
