@@ -10,7 +10,7 @@
   <shapepicker
     user = {{ user.sub |tojson }}
     key = {{ key.signature |tojson }}
-    staticprefix = {{url_for ('planitapi.static', filename='') |tojson}}
+    staticprefix = {{url_for ('cslpwan.static', filename='') |tojson}}
     apiprefix = {{url_for ('planitapi.index')}}>
   </shapepicker>
 
