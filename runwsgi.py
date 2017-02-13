@@ -37,7 +37,7 @@ logging.basicConfig(
                 backupCount = 6)),
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-app = Flask('main',static_url_path='/web/static')
+app = Flask('main',static_url_path='/static')
 app.config.update({
     'MONGO_HOST': 'eg-mongodb',
     'MONGO_PORT': 27017,
