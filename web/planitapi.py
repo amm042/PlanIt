@@ -275,15 +275,15 @@ def analyze():
             os.path.join(os.getcwd(), 'web/static')))
 
         coverage = PlotCoverage(rdocs, os.path.join(os.getcwd(),
-            os.path.join('static/results/coverage')), str(cache['_id']))
+            os.path.join('web/static/results/coverage')), str(cache['_id']))
 
         loss = PlotLoss(rdocs, float(args['lossThreshold']),
             os.path.join(os.getcwd(),
-                os.path.join('static/results/loss')), str(cache['_id']))
+                os.path.join('web/static/results/loss')), str(cache['_id']))
 
         contour = PlotContours(rdocs, json_util.loads(args['bounds']),
             float(args['lossThreshold']), os.path.join(os.getcwd(),
-                os.path.join('static/results/contour')), str(cache['_id']))
+                os.path.join('web/static/results/contour')), str(cache['_id']))
 
         cache['coverage'] = coverage
         cache['loss'] = loss
