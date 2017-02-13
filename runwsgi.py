@@ -53,13 +53,13 @@ app.config['EXPLAIN_TEMPLATE_LOADING'] = False
 app.config['TEMPLATES_AUTO_RELOAD'] = True
 planitdb.init_db(app)
 
-app.register_blueprint(bp_login, url_prefix='/user')
-app.register_blueprint(bp_keyapi, url_prefix='/keys')
-app.register_blueprint(bp_cslpwan, url_prefix='/cslpwan')
-app.register_blueprint(bp_planitapi, url_prefix='/planitapi')
-app.register_blueprint(bp_planitv1, url_prefix='/planit')
-app.register_blueprint(bp_docs, url_prefix='/docs')
-app.register_blueprint(bp_root, url_prefix='')
+app.register_blueprint(bp_login, url_prefix='/planit/user')
+app.register_blueprint(bp_keyapi, url_prefix='/planit/keys')
+app.register_blueprint(bp_cslpwan, url_prefix='/planit/cslpwan')
+app.register_blueprint(bp_planitapi, url_prefix='/planit/planitapi')
+app.register_blueprint(bp_planitv1, url_prefix='/planit/planit')
+app.register_blueprint(bp_docs, url_prefix='/planit/docs')
+app.register_blueprint(bp_root, url_prefix='/planit')
 
 # @app.errorhandler(404)
 # def page_not_found(error):
