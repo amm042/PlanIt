@@ -21,7 +21,6 @@ from elevation import Elevation
 
 import pymongo
 
-from pykml.factory import KML_ElementMaker as KML
 from lxml import etree
 import datetime
 from pprint import pprint
@@ -422,6 +421,9 @@ if __name__=="__main__":
 		# plot coverage gradient
 		make_kml = True
 		if make_kml:
+
+			from pykml.factory import KML_ElementMaker as KML
+			
 			fig = plt.figure()
 			ax = plt.Axes(fig, [0,0,1,1])
 			ax.set_axis_off()
