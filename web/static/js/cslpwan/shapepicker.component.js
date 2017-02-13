@@ -340,6 +340,7 @@ angular.module("cslpwanApp")
         var bounds = gmap.getBounds();
         console.log(gmap.getBounds().toJSON());
         $http.post(me.apiprefix + 'analyze', {
+          static: me.staticprefix,
           key: me.key,
           freq: me.freqMhz,
           model: me.itwomModel,
