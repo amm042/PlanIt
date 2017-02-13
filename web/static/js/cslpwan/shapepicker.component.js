@@ -44,9 +44,15 @@ angular.module("cslpwanApp")
 
       var me = this;
 
-
       me.states = $window.state_data;
+      me.mapcontrol = {};
+      me.debugme = function(){
+        console.log("map control is: ");
+        var gmap = me.mapcontrol.getGMap();
 
+        console.log(gmap.getBounds().toJSON());
+
+      }
       me.cityCountyReset = function() {
         me.selectedCities = [];
         document.getElementById('cityInput').value = me.selectedCities;
@@ -330,6 +336,9 @@ angular.module("cslpwanApp")
       } // sample points
       me.analyze = function(){
         me.busy = true;
+        var gmap = me.mapcontrol.getGMap();
+        var bounds = gmap.getBounds();
+        console.log(gmap.getBounds().toJSON());
         $http.post(me.apiprefix + 'analyze', {
           key: me.key,
           freq: me.freqMhz,
@@ -340,13 +349,28 @@ angular.module("cslpwanApp")
           txHeight: me.txHeight,
           rxHeight: me.rxHeight,
           model: me.itwomModel,
-          pointid: $location.search().pointid
+          pointid: $location.search().pointid,
+          bounds: JSON.stringify (bounds)
         }).then(function success(response){
           me.busy = false
           console.log("analyze success response");
           console.log(response);
           me.coverage = response.data.coverage
           me.loss = response.data.loss
+
+          // remove any existing overlays.
+          if (me.overlay != undefined){
+            me.overlay.setMap(null);
+            delete me.overlay;
+          }
+
+          me.overlay = new google.maps.GroundOverlay(
+            response.data.contour,
+            bounds,
+            {opacity: 0.5}
+          )
+          me.overlay.setMap(gmap);
+
         }, function fail(response){
           me.busy = false
           console.log("FAIL");

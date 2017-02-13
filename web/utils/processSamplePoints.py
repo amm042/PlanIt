@@ -14,7 +14,7 @@ from pyproj import Geod, Proj, transform
 import matplotlib.pyplot as plt
 from descartes import PolygonPatch
 
-from shapely.geometry import shape, mapping
+from shapely.geometry import shape, mapping, Point
 from county_lookup import state_name, county_name
 
 from elevation import Elevation
@@ -28,7 +28,7 @@ from pprint import pprint
 
 import random
 
-from bson import ObjectId
+from bson import ObjectId, json_util
 
 from multiprocessing import Process, Queue
 
@@ -37,6 +37,7 @@ import logging
 import os
 
 log = logging.getLogger(__name__)
+
 
 def plot_contours(area, points, fig, ax, plot_legend= True, plot_points= True):
 
@@ -140,7 +141,7 @@ def plot_shapes(ax, shapes, filled = False, show_states = False, fc=None, alpha=
 		for p in patches:
 			ax.add_patch(p)
 
-def evaluate_points(q, num_base, loss_threshold, pointdoc,
+def evaluate_points(q, num_base, loss_threshold, pointdoc, bounds,
 	tx_height, rx_height,
 	run_id, itwomparam,
 	conn_str = 'mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015',
@@ -162,12 +163,13 @@ def evaluate_points(q, num_base, loss_threshold, pointdoc,
 		olddocs = db['POINTRESULTS'].find({
 						'name': d['name'],
 						'point_docid': d['_id'],
+						'loss_threshold': loss_threshold,
 						'run': run_id,
+						'bounds': json_util.dumps(bounds),
 						'itwomparam': itwomparam.__dict__,
 						'num_basestations': num_base,
 						'tx_height': tx_height,
-						'rx_height': rx_height},
-						{'_id': 1})
+						'rx_height': rx_height})
 		dc = olddocs.count()
 		if dc > 1:
 			ods = [x['_id'] for x in olddocs]
@@ -201,7 +203,9 @@ def evaluate_points(q, num_base, loss_threshold, pointdoc,
 			'num_basestations': num_base,
 			'num_points': len(d['points']),
 			'itwomparam': itwomparam.__dict__,
+			'bounds': json_util.dumps(bounds),
 			'nodes': [],
+			'grid': [],
 			'basestations': basestations,
 			'gentime': datetime.datetime.utcnow(),
 			'tx_height': tx_height,
@@ -233,15 +237,40 @@ def evaluate_points(q, num_base, loss_threshold, pointdoc,
 
 				min_loss = min(l)
 				loss.append(min_loss)
-				# logging.info("min loss is: {}, threshold is: {}".format(
-				# 	min_loss, loss_threshold
-				# ))
+
 				if min_loss < loss_threshold:
 					connected += 1
 				else:
 					disconnected += 1
 
-				resultdoc['nodes'].append({'point':p, 'loss': l, 'min_loss': min_loss, 'connected': min_loss < loss_threshold})
+				resultdoc['nodes'].append(
+					{'point':p,
+					'loss': l,
+					'min_loss': min_loss,
+					'connected': min_loss < loss_threshold})
+		if bounds != None:
+			# generate simple 10x10 grid around given bounds as well.
+			xmin,ymax,xmax,ymin = (bounds['west'], bounds['north'], bounds['east'], bounds['south'])
+			#g = np.mgrid[xmin:xmax:((xmax-xmin)/10), ymin:ymax:((ymax-ymin)/10)]
+			# use imaginary number to include bounds
+			# https://docs.scipy.org/doc/numpy/reference/generated/numpy.mgrid.html
+			g = np.mgrid[xmin:xmax:11j, ymin:ymax:11j]
+
+			# print("Generating points from bounds: {}".format(bounds))
+			# print("xmin,ymax,xmax,ymin: ", xmin,ymax,xmax,ymin)
+			for point in zip(*(x.flat for x in g)):
+				l = [point_loss(
+					(b['geometry']['coordinates'][0], b['geometry']['coordinates'][1]), tx_height,
+					(point[0], point[1]), rx_height,
+					params=itwomparam, elev=elev)[0] for b in basestations]
+
+				min_loss = min(l)
+				loss.append(min_loss)
+				resultdoc['grid'].append({
+					'point': {'geometry': mapping(Point(point))},
+					'loss': l,
+					'min_loss': min_loss
+				})
 
 		resultdoc['connected'] = connected / (connected+disconnected)
 
@@ -252,10 +281,8 @@ def evaluate_points(q, num_base, loss_threshold, pointdoc,
 	logging.info("{} done.".format(pid))
 
 def AnalyzePoints(dbcon, connect_str, srtm_path, pointid, numBase = [1], numRuns = 1,
-	freq = 915.0, txHeight=5, rxHeight=1, model='city',
-	lossThreshold = 148):
-
-
+	freq = 915.0, txHeight=5, rxHeight=1, model='city', bounds=None,
+	lossThreshold = 148, **kwargs):
 
 	pointdocs = dbcon['POINTS'].find({"_id": ObjectId(pointid)})
 	logging.info("getting {} point data docs for {}...".format(
@@ -285,8 +312,9 @@ def AnalyzePoints(dbcon, connect_str, srtm_path, pointid, numBase = [1], numRuns
 			# 	del jobs[0]
 			pcount += 1
 			j = Process(target=evaluate_points,
-					args=(q, num_base, lossThreshold, r,
-						txHeight, rxHeight,
+					args=(q, int(num_base), float(lossThreshold), r,
+						json_util.loads(bounds),
+						float(txHeight), float(rxHeight),
 						run_id, itwomparam, connect_str, srtm_path),
 					name="{} {} basestations".format(pointid, num_base))
 			j.start()

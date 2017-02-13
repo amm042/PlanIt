@@ -5,6 +5,8 @@ import numpy as np
 from pyproj import Geod, Proj, transform
 
 import matplotlib.pyplot as plt
+from matplotlib.ticker import NullLocator
+from scipy.interpolate import interp2d, griddata
 
 from descartes import PolygonPatch
 
@@ -21,38 +23,34 @@ import os.path
 import random
 
 from bson import ObjectId
-
-def plot_contours(area, points, fig, ax, plot_legend= True, plot_points= True):
+from types import SimpleNamespace
+def plot_contours(area, points, fig, ax, plot_legend= True, plot_points= True,
+	threshold = 180):
 
 	geod = Geod(ellps='WGS84')
 
-	xmin = area.bounds[0]
-	xmax = area.bounds[2]
-	ymin = area.bounds[1]
-	ymax = area.bounds[3]
+	xmin,ymax,xmax,ymin = area.bounds
 
-	X = np.linspace(xmin, xmax)
-	Y = np.linspace(ymin, ymax)
-	Z = np.zeros([len(Y), len(X)])
+	x,y,z  = zip(*points)
+	X,Y = np.mgrid[xmin:xmax:((xmax-xmin)/250), ymin:ymax:((ymax-ymin)/250)]
+	Z = griddata( (x,y), z, (X,Y), method='cubic')
+	#Z = griddata( (x,y), z, (X,Y), method='linear')
 
-
-	mindb = 60
-	maxdb = 180
+	mindb = threshold-100
+	maxdb = threshold
 	N = int((maxdb - mindb) / 10)
 	v = np.linspace(mindb, maxdb, N+1)
 
-	# generate contour volues with Shepard's Method
-	for x in range(0, len(X)):
-		for y in range(0, len(Y)):
-
-			# sum of distances from this point to all points
-			totaldist = sum ([geod.inv(X[x], Y[y], p[0], p[1])[2]**-8 for p in points])
-
-			Z[y,x] = min(maxdb, sum([p[2]*(geod.inv(X[x], Y[y], p[0], p[1])[2]**-8)/totaldist for p in points]))
+	# replace anything less than mindb with mindb (leaving max/NaN alone)
+	#print(Z)
+	#np.maximum(Z, mindb, out=Z)
+	#print("-"*80)
+	#print(Z)
+	#np.clip(Z, mindb, maxdb, out=Z)
 
 	#CS = ax.contour(X,Y,Z,N, linewidth=0.5, colors='k', alpha=0.3)
 	CSF = ax.contourf(X,Y,Z,N, cmap=plt.cm.RdYlGn_r, alpha=1,
-		vmin = v[0], vmax=v[-1], levels=v)
+		vmin = v[0], vmax=v[-1], levels=v, extend='min')
 		#vmin = min([p[2] for p in points]), vmax=max([p[2] for p in points]))
 
 	if plot_legend:
@@ -61,8 +59,8 @@ def plot_contours(area, points, fig, ax, plot_legend= True, plot_points= True):
 
 	if plot_points:
 		for p in points:
-			print (p)
-			ax.plot(p[0], p[1], '.', color='k', ms=4)
+			#print (p)
+			ax.plot(p[0], p[1], '.', color='k', ms=2, alpha=0.6)
 
 def make_patch(geo, **kwargs):
 	"takes a geoJSON geometry and returns something matplotlib understands"
@@ -122,6 +120,59 @@ def plot_shapes(ax, shapes, filled = False, show_states = False):
 		patches = make_patch(shp['geometry'], fc=fc(i), lw=lw, ec=ec, label=label, alpha=0.16)
 		for p in patches:
 			ax.add_patch(p)
+
+def PlotContours(resdocs, bounds, threshold, out_path, fname):
+	if not os.path.exists(out_path):
+		os.makedirs(out_path)
+	outputfile = os.path.join(out_path, fname + ".png")
+	if os.path.exists(outputfile):
+		logging.info("Skip loss {} exists".format(outputfile))
+		return outputfile
+
+	fig = plt.figure()	#figsize = (12,8)
+	#ax = plt.Axes(fig=fig, rect=[0, 0, 1, 1], facecolor='blue')
+	#ax = plt.subplot(111)
+	ax = fig.add_subplot(111, facecolor=None)
+	ax.set_axis_off()
+	ax.set_frame_on(False)
+	ax.autoscale(False)
+
+	b =SimpleNamespace()
+	b.bounds = (bounds['west'], bounds['north'], bounds['east'], bounds['south'])
+
+
+	xmin,ymax,xmax,ymin = b.bounds
+	ax.set_xlim((xmin, xmax))
+	ax.set_ylim((ymin, ymax))
+	ax.margins(0,0)
+	ax.xaxis.set_major_locator(NullLocator())
+	ax.yaxis.set_major_locator(NullLocator())
+
+	points = {}
+	for doc in resdocs:
+		for k in ['nodes', 'grid']:
+			for x in doc[k]:
+				l = (x['point']['geometry']['coordinates'][0],
+					 x['point']['geometry']['coordinates'][1])
+				if l in points:
+					points[l] += [x['min_loss']]
+				else:
+					points[l] = [x['min_loss']]
+
+	points = [(k[0], k[1], float(np.mean(v))) for k,v in points.items() ]
+
+	plot_contours(
+		b,
+		points,
+		fig,
+		ax,
+		threshold = threshold,
+		plot_legend=False, plot_points=True)
+
+	fig.subplots_adjust(top=1,bottom=0,right=1,left=0,hspace=0,wspace=0)
+	fig.savefig(outputfile, dpi=300, transparent=True,
+		bbox_inches="tight", pad_inches=0.0, frameon=False)
+	return outputfile
 
 def PlotLoss(resdocs, threshold, out_path, fname):
 	if not os.path.exists(out_path):

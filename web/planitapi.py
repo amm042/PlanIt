@@ -6,7 +6,8 @@ from .decorators import *
 
 
 import matplotlib
-matplotlib.use('pdf')
+#matplotlib.use('pdf')
+matplotlib.use('Agg')
 
 from elevation import Elevation
 from geopath import GeoPath
@@ -29,7 +30,7 @@ import os
 
 from .utils.pointSampler import PopulationBasedPointSampler
 from .utils.processSamplePoints import AnalyzePoints
-from .utils.plotPointResults import PlotCoverage, PlotLoss
+from .utils.plotPointResults import PlotCoverage, PlotLoss, PlotContours
 
 SRTM_PATH=os.path.join(os.getcwd(),"../SRTM_RAW")
 elev = Elevation(srtm_path=SRTM_PATH, mongo_str= None)
@@ -235,6 +236,7 @@ def analyze():
         rxHeight: transmitter reciever agl meters [required]
         model: itwom model 'city' or 'average' [required]
         lossThreshold: radio loss threshold (float) [required]
+        bounds: map bounds (LatLngBounds.toJSON) to plot contour [required]
         key: api key [required]
 
     todo: make this async.
@@ -252,7 +254,9 @@ def analyze():
     else:
         planitdb.mongo.db['RUNCACHE'].insert(cache)
 
-    if 'loss' not in cache or 'coverage' not in cache:
+    if 'loss' not in cache or   \
+        'coverage' not in cache or  \
+        'contour' not in cache:
         # save result set in database, pass object id of results
         # and links to plot images back to web service
         mstr = "mongodb://{}:{}@{}:{}/{}".format(
@@ -261,6 +265,7 @@ def analyze():
             current_app.config.get('MONGO_HOST'),
             current_app.config.get('MONGO_PORT'),
             current_app.config.get('MONGO_DBNAME'))
+
         rdocs = AnalyzePoints(dbcon = planitdb.mongo.db,
             connect_str = mstr,
             srtm_path=SRTM_PATH, **args)
@@ -272,11 +277,17 @@ def analyze():
         coverage = PlotCoverage(rdocs, os.path.join(os.getcwd(),
             os.path.join('static/results/coverage')), str(cache['_id']))
 
-        loss = PlotLoss(rdocs, args['lossThreshold'], os.path.join(os.getcwd(),
-            os.path.join('static/results/loss')), str(cache['_id']))
+        loss = PlotLoss(rdocs, float(args['lossThreshold']),
+            os.path.join(os.getcwd(),
+                os.path.join('static/results/loss')), str(cache['_id']))
+
+        contour = PlotContours(rdocs, json_util.loads(args['bounds']),
+            float(args['lossThreshold']), os.path.join(os.getcwd(),
+                os.path.join('static/results/contour')), str(cache['_id']))
 
         cache['coverage'] = coverage
         cache['loss'] = loss
+        cache['contour'] = contour
         planitdb.mongo.db['RUNCACHE'].update(
             {'_id': cache['_id']}, cache)
 
@@ -285,7 +296,10 @@ def analyze():
             filename='results/loss/'+os.path.basename(cache['loss'])),
         'coverage': url_for('static',
             filename='results/coverage/'+os.path.basename(cache['coverage'])),
+        'contour': url_for('static',
+            filename='results/contour/'+os.path.basename(cache['contour'])),
             }
+
     return jsonify(result)
 
 @bp_planitapi.route("/sample", methods=('POST',))

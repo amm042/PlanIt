@@ -44,6 +44,7 @@
 <ui-gmap-google-map ng-if='$ctrl.show.map'
   center='$ctrl.map.center' pan='$ctrl.map.pan'
   zoom='$ctrl.map.zoom' bounds='$ctrl.map.bounds'
+  control='$ctrl.mapcontrol'
   style='height: 400px'>
 
   <ui-gmap-polygons ng-if='$ctrl.show.selection'
@@ -156,6 +157,8 @@
       </div>
     </form>
     <button type="submit" class="btn btn-default" ng-click="$ctrl.analyze()">Analyze the network</button>
+
+    <button type="submit" class="btn btn-default" ng-click="$ctrl.debugme()">Debugme</button>
   </div>
   <div role="tabpanel" class="tab-pane" id="coverage">
     <h4>Coverage</h4>
