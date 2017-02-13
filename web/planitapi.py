@@ -272,7 +272,7 @@ def analyze():
 
         ## generate plots of results
         logging.info("static path is {}".format(
-            os.path.join(os.getcwd(), 'static')))
+            os.path.join(os.getcwd(), 'web/static')))
 
         coverage = PlotCoverage(rdocs, os.path.join(os.getcwd(),
             os.path.join('static/results/coverage')), str(cache['_id']))
