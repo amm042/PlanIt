@@ -277,28 +277,27 @@ def analyze():
         PlotCoverage(rdocs, os.path.join(os.getcwd(),
             os.path.join('web/static/results/coverage')), str(cache['_id']))
 
-        PlotLoss(rdocs, float(args['lossThreshold']),
+        cache['coverage'] = cache['loss'] = PlotLoss(rdocs, float(args['lossThreshold']),
             os.path.join(os.getcwd(),
                 os.path.join('web/static/results/loss')), str(cache['_id']))
 
-        PlotContours(rdocs, json_util.loads(args['bounds']),
+        cache['contour'] = PlotContours(rdocs, json_util.loads(args['bounds']),
             float(args['lossThreshold']), os.path.join(os.getcwd(),
                 os.path.join('web/static/results/contour')), str(cache['_id']))
-        contour = os.path.join(args['static'], 'results/contour', str(cache['_id']) + '.png')
-        loss = os.path.join(args['static'], 'results/loss', str(cache['_id']) + '.pdf')
-        coverage = os.path.join(args['static'], 'results/coverage', str(cache['_id']) + '.pdf')
-        cache['coverage'] = coverage
-        cache['loss'] = loss
-        cache['contour'] = contour
+
+        # cache['coverage'] = os.path.join(args['static'], 'results/coverage', str(cache['_id']) + '.pdf')
+        # cache['loss'] = os.path.join(args['static'], 'results/loss', str(cache['_id']) + '.pdf')
+        # cache['contour'] = os.path.join(args['static'], 'results/contour', str(cache['_id']) + '.png')
+
         planitdb.mongo.db['RUNCACHE'].update(
             {'_id': cache['_id']}, cache)
 
     result = {'args': args,
-        'loss': url_for('static',
+        'loss': url_for('root.static',
             filename='results/loss/'+os.path.basename(cache['loss'])),
-        'coverage': url_for('static',
+        'coverage': url_for('root.static',
             filename='results/coverage/'+os.path.basename(cache['coverage'])),
-        'contour': url_for('static',
+        'contour': url_for('root.static',
             filename='results/contour/'+os.path.basename(cache['contour'])),
             }
 
