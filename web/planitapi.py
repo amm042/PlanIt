@@ -284,9 +284,9 @@ def analyze():
         PlotContours(rdocs, json_util.loads(args['bounds']),
             float(args['lossThreshold']), os.path.join(os.getcwd(),
                 os.path.join('web/static/results/contour')), str(cache['_id']))
-        contour = os.path.join(args['static'], 'results/contour', str(cache['_id']) + '.pdf')
+        contour = os.path.join(args['static'], 'results/contour', str(cache['_id']) + '.png')
         loss = os.path.join(args['static'], 'results/loss', str(cache['_id']) + '.pdf')
-        coverage = os.path.join(args['static'], 'results/coverage', str(cache['_id']) + '.jpg')
+        coverage = os.path.join(args['static'], 'results/coverage', str(cache['_id']) + '.pdf')
         cache['coverage'] = coverage
         cache['loss'] = loss
         cache['contour'] = contour
