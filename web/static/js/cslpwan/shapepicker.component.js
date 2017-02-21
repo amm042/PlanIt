@@ -39,8 +39,8 @@ angular.module("cslpwanApp")
       apiprefix: '@',
     },
     templateUrl: 'static/js/cslpwan/shapepicker.html',
-    controller: ['$http', '$window', '$location',
-      function shapepickerController($http, $window, $location) {
+    controller: ['$http', '$window', '$location', '$timeout',
+      function shapepickerController($http, $window, $location, $timeout) {
 
       var me = this;
 
@@ -93,7 +93,6 @@ angular.module("cslpwanApp")
       }
 
       me.$onInit = function(){
-
         console.log("shapepickerController onInit:");
         console.log("shapepickerController running with apiprefix: " + me.apiprefix);
         console.log("shapepickerController running with key: " + me.key);
@@ -116,6 +115,8 @@ angular.module("cslpwanApp")
         me.txHeight = 5;
         me.rxHeight = 1;
         me.itwomModel = 'city';
+        me.showHideButtonText = 'undef';
+        me.fitPoints= true;
         $("#numPointsInput").val = me.sampleSize.toString();
         console.log(  $("#numPointsInput").val() );
         me.countyPolysSelected ={
@@ -203,6 +204,11 @@ angular.module("cslpwanApp")
 
         if('pointid' in s){
           me.samplePoints();
+        }
+        if('analysisid' in s){
+          // create a fake analyzeresponse
+          me.analyzeResponse = {jobid: 0, id: s.analysisid};
+          me.checkAnalyzeResult();
         }
 
         if ($http.pendingRequests.length == 0){
@@ -293,16 +299,28 @@ angular.module("cslpwanApp")
         }
         $location.search('counties', me.selectedCounties.toString());
       }
-      me.removeSamplePoints = function(){
-        me.show.unselection=true;
-        me.show.selection = true;
-        me.show.points = false;
-        me.points = [];
+      me.hideSamplePoints = function(){
 
-        $location.search('pointid', null);
+        if (me.show.points){
+          me.show.points = false;
+          me.showHideButtonText = 'Show';
+        }else{
+          me.fitPoints = false;
+          me.show.points = true;
+          me.showHideButtonText = 'Hide';
+        }
 
+        //me.show.unselection=true;
+        //me.show.selection = true;
+
+        //me.points = [];
+        //$location.search('pointid', null);
       }
-      me.samplePoints = function (){
+      me.samplePoints = function (clearexisting=false){
+        if (clearexisting){
+          me.points = [];
+          $location.search('pointid', null);
+        }
         console.log('sampling ' + me.sampleSize + ' points.');
         console.log("search is");
         console.log($location.search());
@@ -318,14 +336,18 @@ angular.module("cslpwanApp")
           .then(function susccess(response){
             me.show.unselection=false;
             me.show.selection = true;
-
             me.busy = false;
-            console.log(response.data);
-            console.log("point id is " + response.data.pointid.toString());
-            me.points = response.data.points;
-            me.show.points = true;
 
-            $location.search('pointid', response.data.pointid.toString());
+            console.log(response.data);
+
+            if ('pointid' in response.data){
+              console.log("point id is " + response.data.pointid.toString());
+              me.points = response.data.points;
+              me.fitPoints = true;
+              me.show.points = true;
+              me.showHideButtonText = 'Hide';
+              $location.search('pointid', response.data.pointid.toString());
+            }
 
           }, function fail(response){
             me.busy = false;
@@ -334,11 +356,53 @@ angular.module("cslpwanApp")
           });
 
       } // sample points
+
+      me.checkAnalyzeResult = function(){
+          $http.post(me.apiprefix + 'analyzeResult', {
+              key: me.key,
+              jobid: me.analyzeResponse.jobid,
+              id: me.analyzeResponse.id}).then(function success(response){
+                if (response.data.complete){
+                  console.log("got analyzeResult [complete].");
+                  console.log(response);
+                  me.busy = false
+
+                  $location.search('analysisid', response.data.id);
+                  me.coverage = response.data.coverage
+                  me.loss = response.data.loss
+
+                  // remove any existing overlays.
+                  if (me.overlay != undefined){
+                    me.overlay.setMap(null);
+                    delete me.overlay;
+                  }
+
+                  var gmap = me.mapcontrol.getGMap();
+
+                  me.overlay = new google.maps.GroundOverlay(
+                    response.data.contour,
+                    response.data.args.bounds,
+                    {opacity: 0.5}
+                  )
+                  me.overlay.setMap(gmap);
+                }else{
+                  console.log("got analyzeResult [NOT complete].");
+                  console.log(response);
+                  $timeout(me.checkAnalyzeResult, 100);
+                }
+
+              }, function fail(response){
+                me.busy = false
+                console.log("failed to get analyzeResult.");
+                console.log(response);
+              });
+        };//checkAnalyzeResult
+
       me.analyze = function(){
         me.busy = true;
         var gmap = me.mapcontrol.getGMap();
         var bounds = gmap.getBounds();
-        console.log(gmap.getBounds().toJSON());
+        //console.log(gmap.getBounds().toJSON());
         $http.post(me.apiprefix + 'analyze', {
           static: me.staticprefix,
           key: me.key,
@@ -351,26 +415,36 @@ angular.module("cslpwanApp")
           rxHeight: me.rxHeight,
           model: me.itwomModel,
           pointid: $location.search().pointid,
-          bounds: JSON.stringify (bounds)
+          //bounds: JSON.stringify (bounds)
+          bounds: bounds
         }).then(function success(response){
-          me.busy = false
-          console.log("analyze success response");
+
+          me.busy = true
+          console.log("analyze response");
           console.log(response);
-          me.coverage = response.data.coverage
-          me.loss = response.data.loss
+          me.analyzeResponse = response.data;
 
-          // remove any existing overlays.
-          if (me.overlay != undefined){
-            me.overlay.setMap(null);
-            delete me.overlay;
+          if (me.analyzeResponse.complete){
+            me.busy = false
+
+            me.coverage = response.data.coverage
+            me.loss = response.data.loss
+            $location.search('analysisid', response.data.id);
+            // remove any existing overlays.
+            if (me.overlay != undefined){
+              me.overlay.setMap(null);
+              delete me.overlay;
+            }
+
+            me.overlay = new google.maps.GroundOverlay(
+              response.data.contour,
+              bounds,
+              {opacity: 0.5}
+            )
+            me.overlay.setMap(gmap);
+          }else{
+            $timeout(me.checkAnalyzeResult, 100);
           }
-
-          me.overlay = new google.maps.GroundOverlay(
-            response.data.contour,
-            bounds,
-            {opacity: 0.5}
-          )
-          me.overlay.setMap(gmap);
 
         }, function fail(response){
           me.busy = false

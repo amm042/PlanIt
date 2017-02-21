@@ -35,6 +35,10 @@
       </ul>
 
     {% else %}
+      <ul class=nav navbar-nav>
+        {% block navbar %}{% endblock %}
+      </ul>
+
       <ul class="nav navbar-nav navbar-right">
         <li><p class="navbar-text">Signed in as <a href="#" class="navbar-link">{{ user.name }}</a></p></li>
 

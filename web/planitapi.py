@@ -1,4 +1,4 @@
-from flask import Blueprint, session, request, g, Response, url_for, current_app
+from flask import Blueprint, session, request, g, Response, url_for, current_app, copy_current_request_context
 import logging
 
 from .data import *
@@ -23,6 +23,7 @@ import traceback
 
 import inspect
 import time
+import pymongo
 
 from shapely.geometry import mapping, shape, Point, Polygon, MultiPolygon
 
@@ -37,6 +38,15 @@ elev = Elevation(srtm_path=SRTM_PATH, mongo_str= None)
 bp_planitapi = Blueprint('planitapi', __name__,
     template_folder ='templates',
     static_folder = 'static')
+
+
+bp_planitapi_app = None
+
+@bp_planitapi.record
+def record_app(setup_state):
+    global bp_planitapi_app
+    bp_planitapi_app = setup_state.app
+    logging.info("record flask app called for planitapi.")
 
 #http://code.activestate.com/recipes/52308-the-simple-but-handy-collector-of-a-bunch-of-named/?in=user-97991
 # class Bunch:
@@ -221,6 +231,40 @@ def geonames():
         "cities": simplifyShapes(cities),
         "counties": simplifyShapes(counties)
     })
+
+@bp_planitapi.route("/analyzeResult", methods=('POST',))
+@log
+@require_key
+def analyzeResult():
+    args = request.json
+    logging.info("analyzeResult args: {}".format(args))
+    if 'id' in args:
+        crs = planitdb.mongo.db['RUNCACHE'].find({'_id': ObjectId(args['id'])})
+        if crs.count() > 0:
+            cache = crs.next()
+
+            result = {'id': str(cache['_id']),
+                'complete': cache['complete'],
+                'args': cache['args']}
+
+            if cache['complete']:
+                logging.info("analyzeResult, job complete.")
+                result['loss'] = url_for('root.static',
+                    filename='results/loss/'+os.path.basename(cache['loss']))
+                result['coverage'] = url_for('root.static',
+                    filename='results/coverage/'+os.path.basename(cache['coverage']))
+                result['contour'] = url_for('root.static',
+                    filename='results/contour/'+os.path.basename(cache['contour']))
+            else:
+                logging.info("analyzeResult, job NOT YET complete.")
+            return jsonify(result)
+        else:
+            logging.info("analyzeResult, no results for id {}.".format(args['id']))
+            return jsonify({"error": "no results for that id."}), 500
+    else:
+        logging.info("analyzeResult, no id given.")
+        return jsonify({"error": "must specify id to get result for."}), 500
+
 @bp_planitapi.route("/analyze", methods=('POST',))
 @log
 @require_key
@@ -239,69 +283,93 @@ def analyze():
         bounds: map bounds (LatLngBounds.toJSON) to plot contour [required]
         key: api key [required]
 
-    todo: make this async.
+    This is a two-part call due to the possibly long running analysis.
+    First call analyze and get a id/jobid. Then pass these to
+    analizeResult() to get the results/check progress.
     """
 
     args = request.json
-    logging.info("analyze args: {}".format(args))
 
-    #check if we have results from a previous run
-    cache = {'args': args}
-    curs = planitdb.mongo.db['RUNCACHE'].find({'args': args})
-    if curs.count() > 0:
-        logging.info("Cache hit, returning cached results.")
-        cache = curs.next()
-    else:
-        planitdb.mongo.db['RUNCACHE'].insert(cache)
+    @copy_current_request_context
+    def async(db, args):
+        #global bp_planitapi_app
+        #with bp_planitapi_app.app_context():
+            logging.info("analyze args: {}".format(args))
 
-    if 'loss' not in cache or   \
-        'coverage' not in cache or  \
-        'contour' not in cache:
-        # save result set in database, pass object id of results
-        # and links to plot images back to web service
-        mstr = "mongodb://{}:{}@{}:{}/{}".format(
-            current_app.config.get('MONGO_USERNAME'),
-            current_app.config.get('MONGO_PASSWORD'),
-            current_app.config.get('MONGO_HOST'),
-            current_app.config.get('MONGO_PORT'),
-            current_app.config.get('MONGO_DBNAME'))
+            #check if we have results from a previous run
+            cache = {'args': args}
+            curs = db['RUNCACHE'].find({'args': args})
+            if curs.count() > 0:
+                logging.info("Cache hit, returning cached results.")
+                cache = curs.next()
+            else:
+                cache['complete'] = False
+                db['RUNCACHE'].insert(cache)
 
-        rdocs = AnalyzePoints(dbcon = planitdb.mongo.db,
-            connect_str = mstr,
-            srtm_path=SRTM_PATH, **args)
+            if 'loss' not in cache or   \
+                'coverage' not in cache or  \
+                'contour' not in cache:
+                def worker(mstr, cache):
+                    # save result set in database, pass object id of results
+                    # and links to plot images back to web service
 
-        ## generate plots of results
-        logging.info("static path is {}".format(
-            os.path.join(os.getcwd(), 'web/static')))
+                    # connect to db in this process.
+                    connection = pymongo.MongoClient(mstr)
+                    db = connection.get_default_database()
+                    rdocs = AnalyzePoints(dbcon=db,
+                        connect_str = mstr,
+                        srtm_path=SRTM_PATH, **args)
 
-        PlotCoverage(rdocs, os.path.join(os.getcwd(),
-            os.path.join('web/static/results/coverage')), str(cache['_id']))
+                    ## generate plots of results
+                    logging.info("static path is {}".format(
+                        os.path.join(os.getcwd(), 'web/static')))
 
-        cache['coverage'] = cache['loss'] = PlotLoss(rdocs, float(args['lossThreshold']),
-            os.path.join(os.getcwd(),
-                os.path.join('web/static/results/loss')), str(cache['_id']))
+                    cache['coverage'] = PlotCoverage(rdocs, os.path.join(os.getcwd(),
+                        os.path.join('web/static/results/coverage')), str(cache['_id']))
 
-        cache['contour'] = PlotContours(rdocs, json_util.loads(args['bounds']),
-            float(args['lossThreshold']), os.path.join(os.getcwd(),
-                os.path.join('web/static/results/contour')), str(cache['_id']))
+                    cache['loss'] = PlotLoss(rdocs, float(args['lossThreshold']),
+                        os.path.join(os.getcwd(),
+                            os.path.join('web/static/results/loss')), str(cache['_id']))
 
-        # cache['coverage'] = os.path.join(args['static'], 'results/coverage', str(cache['_id']) + '.pdf')
-        # cache['loss'] = os.path.join(args['static'], 'results/loss', str(cache['_id']) + '.pdf')
-        # cache['contour'] = os.path.join(args['static'], 'results/contour', str(cache['_id']) + '.png')
+                    cache['contour'] = PlotContours(rdocs, cache['args']['bounds'],
+                        float(args['lossThreshold']), os.path.join(os.getcwd(),
+                            os.path.join('web/static/results/contour')), str(cache['_id']))
 
-        planitdb.mongo.db['RUNCACHE'].update(
-            {'_id': cache['_id']}, cache)
+                    cache['complete'] = True
 
-    result = {'args': args,
-        'loss': url_for('root.static',
-            filename='results/loss/'+os.path.basename(cache['loss'])),
-        'coverage': url_for('root.static',
-            filename='results/coverage/'+os.path.basename(cache['coverage'])),
-        'contour': url_for('root.static',
-            filename='results/contour/'+os.path.basename(cache['contour'])),
-            }
+                    db['RUNCACHE'].update(
+                        {'_id': cache['_id']}, cache)
 
-    return jsonify(result)
+                proc = Process(target=worker,
+                    args=("mongodb://{}:{}@{}:{}/{}".format(
+                            current_app.config.get('MONGO_USERNAME'),
+                            current_app.config.get('MONGO_PASSWORD'),
+                            current_app.config.get('MONGO_HOST'),
+                            current_app.config.get('MONGO_PORT'),
+                            current_app.config.get('MONGO_DBNAME')),
+                            cache),
+                    name="analysis job")
+                proc.start()
+
+                result = {'args': args,
+                    'jobid': proc.pid,
+                    'id': str(cache['_id'])}
+
+            else:
+                result = {'id': str(cache['_id']),
+                    'complete': cache['complete'],
+                    'args': args,
+                    'loss': url_for('root.static',
+                        filename='results/loss/'+os.path.basename(cache['loss'])),
+                    'coverage': url_for('root.static',
+                        filename='results/coverage/'+os.path.basename(cache['coverage'])),
+                    'contour': url_for('root.static',
+                        filename='results/contour/'+os.path.basename(cache['contour'])),
+                        }
+
+            return json_util.dumps(result)
+
+    return Response(async(planitdb.mongo.db, args), mimetype='application/json')
 
 @bp_planitapi.route("/sample", methods=('POST',))
 @log
@@ -326,68 +394,74 @@ def sample():
     args = request.json
     logging.info("sample args: {}".format(args))
 
-    if 'pointid' in args:
-        cur = planitdb.mongo.db.POINTS.find({'_id': ObjectId(args['pointid'])})
-        if cur.count() > 0:
-            logging.info("got points from DB.")
-            result = cur.next()
-            result['pointid'] = str(result['_id'])
-            del result['_id']
-            del result['args']
-            return jsonify(result)
+    #@copy_current_request_context
+    def async(db, args):
+        #global bp_planitapi_app
+        #with bp_planitapi_app.app_context():
+            if 'pointid' in args:
+                cur = db.POINTS.find({'_id': ObjectId(args['pointid'])})
+                if cur.count() > 0:
+                    logging.info("got points from DB.")
+                    result = cur.next()
+                    result['pointid'] = str(result['_id'])
+                    del result['_id']
+                    del result['args']
+                    yield json_util.dumps(result)
+            else:
+                pbs = PopulationBasedPointSampler(db=db)
+                trshapes = []
+                name = args['state']
+                if (len(args['cities'])> 0):
 
-    pbs = PopulationBasedPointSampler(db=planitdb.mongo.db)
-    trshapes = []
-    name = args['state']
-    if (len(args['cities'])> 0):
+                    c = db['GENZ2010_160'].find({
+                        'properties.STATE':args['state'],
+                        'properties.LSAD': 'city',
+                        'properties.GEO_ID': {'$in': args['cities']}})
+                    for sh in c:
+                        name += "-" + sh['properties']['NAME']
+                        logging.info("getting tracts for {}".format(sh['properties']))
+                        trshapes += pbs.get_tract_shapes_in_area(sh)
 
-        c = planitdb.mongo.db['GENZ2010_160'].find({
-            'properties.STATE':args['state'],
-            'properties.LSAD': 'city',
-            'properties.GEO_ID': {'$in': args['cities']}})
-        for sh in c:
-            name += "-" + sh['properties']['NAME']
-            logging.info("getting tracts for {}".format(sh['properties']))
-            trshapes += pbs.get_tract_shapes_in_area(sh)
+                if (len(args['counties']) > 0):
 
-    if (len(args['counties']) > 0):
+                    c = db['GENZ2010_050'].find({
+                        'properties.STATE':args['state'],
+                        'properties.LSAD': 'County',
+                        'properties.GEO_ID': {'$in': args['counties']}})
+                    for sh in c:
+                        name += "." + sh['properties']['NAME']
+                        logging.info("getting tracts for {}".format(sh['properties']))
+                        trshapes += pbs.get_tract_shapes(
+                            sh['properties']['STATE'],
+                            sh['properties']['COUNTY'])
 
-        c = planitdb.mongo.db['GENZ2010_050'].find({
-            'properties.STATE':args['state'],
-            'properties.LSAD': 'County',
-            'properties.GEO_ID': {'$in': args['counties']}})
-        for sh in c:
-            name += "." + sh['properties']['NAME']
-            logging.info("getting tracts for {}".format(sh['properties']))
-            trshapes += pbs.get_tract_shapes(
-                sh['properties']['STATE'],
-                sh['properties']['COUNTY'])
+                if len(trshapes) == 0:
+                    # use the whole state
+                    trshapes = list(pbs.get_shapes_for_state(args['state']))
 
-    if len(trshapes) == 0:
-        # use the whole state
-        trshapes = list(pbs.get_shapes_for_state(args['state']))
+                logging.info("got {} tract shapes for {}".format(len(trshapes), name))
 
-    logging.info("got {} tract shapes for {}".format(len(trshapes), name))
+                for i, sh in enumerate(trshapes):
+                    logging.info("tract shape {}: {}".format(i, sh['properties']))
+                result ={
+                    'args': args,
+                    'name': name,
+                    'state': args['state'],
+                    'points': [{
+                        'geometry':mapping(p),
+                        'id': 'point_{}'.format(i)} for i,p in
+                            enumerate(pbs.sample(args['count'], trshapes))],
+                    'population': sum([t['properties']['population']['effective'] for t in trshapes]),
+                    'area': sum(t['properties']['area']['effective'] for t in trshapes)
+                }
 
-    for i, sh in enumerate(trshapes):
-        logging.info("tract shape {}: {}".format(i, sh['properties']))
-    result ={
-        'args': args,
-        'name': name,
-        'state': args['state'],
-        'points': [{
-            'geometry':mapping(p),
-            'id': 'point_{}'.format(i)} for i,p in
-                enumerate(pbs.sample(args['count'], trshapes))],
-        'population': sum([t['properties']['population']['effective'] for t in trshapes]),
-        'area': sum(t['properties']['area']['effective'] for t in trshapes)
-    }
+                db.POINTS.insert(result)
+                result['pointid'] = str(result['_id'])
+                del result['_id']
+                del result['args']
+                yield json_util.dumps(result)
 
-    planitdb.mongo.db.POINTS.insert(result)
-    result['pointid'] = str(result['_id'])
-    del result['_id']
-    del result['args']
-    return jsonify(result)
+    return Response(async(planitdb.mongo.db, args), mimetype='application/json')
 
 @bp_planitapi.route('/pathloss', methods=('POST',))
 @log

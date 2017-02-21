@@ -132,14 +132,16 @@ class Elevation():
 								with open(os.path.join(self.srtm_path, zipcontent), 'wb') as outf:
 									outf.write(data)
 
+
+
 					else:
 
-						logging.info("need tile: {} from gridfs".format(tile))
-
 						if self.gfs == None:
-							raise Exception("Could not load tile at {}".format(local_tilefile))
+							logging.info("SRTM zip file missing, need {}".format(os.path.join(self.zip_path, ziptile)))
+
 
 						else:
+							logging.info("need tile: {} from gridfs".format(tile))
 							fp = self.gfs.find_one({'filename':tile})
 							if fp == None:
 								logging.info("Warning tile {} not found on gridfs, assuming sea level (zeros)".format(tile))

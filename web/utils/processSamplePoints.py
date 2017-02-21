@@ -312,7 +312,7 @@ def AnalyzePoints(dbcon, connect_str, srtm_path, pointid, numBase = [1], numRuns
 			pcount += 1
 			j = Process(target=evaluate_points,
 					args=(q, int(num_base), float(lossThreshold), r,
-						json_util.loads(bounds),
+						bounds,
 						float(txHeight), float(rxHeight),
 						run_id, itwomparam, connect_str, srtm_path),
 					name="{} {} basestations".format(pointid, num_base))
@@ -423,7 +423,7 @@ if __name__=="__main__":
 		if make_kml:
 
 			from pykml.factory import KML_ElementMaker as KML
-			
+
 			fig = plt.figure()
 			ax = plt.Axes(fig, [0,0,1,1])
 			ax.set_axis_off()

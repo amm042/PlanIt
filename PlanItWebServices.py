@@ -1,3 +1,12 @@
+"""
+
+Run with gunicorn with multiple workers (production):
+$ gunicorn -w 4 PlanItWebServices:app
+
+Simlpy running this script runs the debug flask server.
+
+"""
+
 import flask
 from flask import Flask, request, render_template, Response, redirect, \
     url_for, session, flash
@@ -18,6 +27,23 @@ from web.thedocs import bp_docs
 # from web import *
 from web.data import *
 from web.decorators import *
+
+# patch for gevent cooperative tasking
+from gevent.wsgi import WSGIServer
+from gevent import monkey
+monkey.patch_all()
+
+import logging
+import logging.handlers
+#logfile =  os.path.splitext(sys.argv[0])[0] + ".log"
+logfile = 'PlanItWebServices.log'
+
+logging.basicConfig(level=logging.DEBUG,
+                handlers=(logging.StreamHandler(stream=sys.stdout),
+                          logging.handlers.RotatingFileHandler(logfile,
+                                                                maxBytes = 256*1024,
+                                                                backupCount = 6), ),
+                format='%(asctime)s - [%(process)d]- %(name)s - %(levelname)s - %(message)s')
 
 app = Flask('main', static_url_path='/web/static')
 app.config.update({
@@ -41,17 +67,9 @@ app.register_blueprint(bp_planitv1, url_prefix='/planit')
 app.register_blueprint(bp_docs, url_prefix='/docs')
 app.register_blueprint(bp_root, url_prefix='')
 
+
 if __name__=="__main__":
 
-    import logging
-    import logging.handlers
-    logfile =  os.path.splitext(sys.argv[0])[0] + ".log"
-
-    logging.basicConfig(level=logging.DEBUG,
-                    handlers=(logging.StreamHandler(stream=sys.stdout),
-                              logging.handlers.RotatingFileHandler(logfile,
-                                                                    maxBytes = 256*1024,
-                                                                    backupCount = 6), ),
-                    format='%(asctime)s - [%(process)d]- %(name)s - %(levelname)s - %(message)s')
-
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    app.run(host="0.0.0.0", port=8000, debug=True)
+    #http_server = WSGIServer(('', 5000), app)
+    #http_server.serve_forever()
