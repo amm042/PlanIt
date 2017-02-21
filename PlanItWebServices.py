@@ -68,7 +68,7 @@ def makeApp(preprefix = '', debug=False):
     app.register_blueprint(bp_planitv1, url_prefix=preprefix+'/planit')
     app.register_blueprint(bp_docs, url_prefix=preprefix+'/docs')
     app.register_blueprint(bp_root, url_prefix=preprefix)
-
+    return app
 
 if __name__=="__main__":
     app = MakeApp(debug=True)

@@ -58,6 +58,8 @@ app.register_blueprint(bp_root, url_prefix='/planit')
 #     print(request.url)
 #     return "page not found", 404
 
+app = makeApp(preprefix='/planit')
+
 @app.before_request
 def redirect_eg():
     u = urlparse(request.url)
@@ -80,7 +82,5 @@ def redirect_eg():
     logging.info("redirect {} to {}".format(request.url, x))
     return redirect(x, code=301)
 
-
-app = makeApp(preprefix='/planit')
 http_server = WSGIServer(('', 4002), app)
 http_server.serve_forever()
