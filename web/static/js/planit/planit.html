@@ -1,0 +1,140 @@
+<div class="loading-spinner-holder">
+  <div class="loading-spinner" ng-show="$ctrl.busy"><img src='static/img/ajax-loader.gif'/></div>
+  <div class="loading-spinner" ng-hide="$ctrl.busy"><img src='static/img/ajax-transparent.gif'/></div>
+</div>
+<!-- ng-if='$ctrl.show.map' -->
+
+<script type="text/ng-template" id="searchbox.tpl.html">
+    <input type="text" size="80" placeholder="Search the map">
+</script>
+
+<h4>Step 1. Search or double click to add base stations</h4>
+<span>(US locations only)</span>
+<ui-gmap-google-map ng-if="$ctrl.show.map"
+  center='$ctrl.map.center' pan='$ctrl.map.pan'
+  zoom='$ctrl.map.zoom' bounds='$ctrl.map.bounds'
+  control='$ctrl.map.control'
+  events='$ctrl.map.events'
+  options='{disableDoubleClickZoom:true}'
+  style='height: 400px'>
+  <!-- parentdiv='mapSearchInput' -->
+
+  <ui-gmap-search-box
+    template='$ctrl.map.searchTemplate'
+    events='$ctrl.map.searchEvents'>
+  </ui-gmap-search-box>
+
+<!-- icon:"http://maps.google.com/mapfiles/ms/icons/green-dot.png" -->
+
+
+  <ui-gmap-markers ng-if="$ctrl.show.points"
+    models="$ctrl.points"
+    fit="$ctrl.map.fitPoints"
+    type="spider"
+    coords="'geometry'">
+  </ui-gmap-markers>
+
+  <ui-gmap-markers ng-if="$ctrl.show.basestations"
+    models="$ctrl.basestations"
+    fit="$ctrl.map.fitPoints"
+    type="spider"
+    coords="'geometry'"
+    events='$ctrl.map.markerEvents'
+    options='{draggable:true,
+      icon:"http://maps.google.com/mapfiles/ms/icons/green-dot.png"}'>
+  </ui-gmap-markers>
+
+</ui-gmap-google-map>
+
+<hr>
+
+
+  <!-- Nav tabs -->
+<ul class="nav nav-tabs" role="tablist">
+  <li role="presentation" class="active"><a href data-target="#basestations" role="tab" data-toggle="tab">Base Stations</a></li>
+  <li ng-show="$ctrl.basestations.length>0" role="presentation"><a href data-target="#sample" role="tab" data-toggle="tab">Sample</a></li>
+  <li ng-show="$ctrl.points.length>0" role="presentation"><a href data-target="#analyze" role="tab" data-toggle="tab">Analyze</a></li>
+  <li ng-show="$ctrl.coverage" role="presentation"><a href data-target="#coverage" role="tab" data-toggle="tab">Coverage</a></li>
+  <li ng-show="$ctrl.loss" role="presentation"><a href data-target="#loss" role="tab" data-toggle="tab">Loss</a></li>
+</ul>
+ <!-- Tab panes -->
+<div class="tab-content">
+  <div role="tabpanel" class="tab-pane active" id="basestations">
+    <h4 ng-show='$ctrl.basestations.length>0'>Step 2, click "Sample" to generate device locations.</h4>
+    <form class="form-inline">
+      <div class="form-group">
+        <label for="radiusInput">Coverage radius (km): </label>
+        <input type="text" id="radiusInput" size="5" ng-model="$ctrl.radius" ng-disabled="$ctrl.busy">
+      </div>
+    </form>
+
+    <table class="table table-condensed">
+      <tr ng-repeat="base in $ctrl.basestations" class="{{base.active}}">
+        <td><span class="glyphicon glyphicon-remove-circle" ng-click="$ctrl.removeBase($index)"></span></td>
+        <td>{{base.id}}</td>
+        <td>{{base.latlng}}</td>
+        <td>{{base.name}}</td>
+        <td>{{base.address}}</td>
+      </tr>
+    </table>
+    <button type="submit" class="btn btn-default" ng-click="$ctrl.removeAllBase()">Remove all base stations</button>
+  </div>
+  <div role="tabpanel" class="tab-pane" id="sample">
+    <h4 ng-show='$ctrl.points.length>0'>Step 3, click "Analyze" to simulate network.</h4>
+    <form class="form-inline">
+      <div class="form-group">
+        <label for="numPointsInput">Number of device locations: </label>
+        <select class="form-control" id="numPointsInput" name="numPointsInput"
+          ng-model="$ctrl.sampleSize" ng-options="x for x in [100,500,1000]"
+          ng-disabled="$ctrl.busy">
+        </select>
+        <button type="submit" class="btn btn-default" ng-hide="$ctrl.points.length>0" ng-click="$ctrl.samplePoints(true)" ng-disabled="$ctrl.busy">Sample</button>
+        <button type="submit" class="btn btn-default" ng-show="$ctrl.points.length>0" ng-click="$ctrl.samplePoints(true)" ng-disabled="$ctrl.busy">Resample</button>
+        <button type="submit" class="btn btn-default" ng-click="$ctrl.hideSamplePoints()" ng-disabled="$ctrl.busy">{{$ctrl.showHideButtonText}}</button>
+      </div>
+    </form>
+  </div>
+
+  <div role="tabpanel" class="tab-pane" id="analyze">
+    <div><b>Step 4, select analysis parameters:</b></div>
+    <form class="form-inline" >
+      <div class="form-group">
+        <label for="freqInput">Frequency (MHz): </label>
+        <input type="text" id="freqInput" size="5" ng-model="$ctrl.freqMhz" ng-disabled="$ctrl.busy">
+      </div>
+      <div class="form-group">
+        <label for="lossInput">Loss threshold (dBm): </label>
+        <input type="text" id="lossInput" size="5" ng-model="$ctrl.lossThreshold" ng-disabled="$ctrl.busy">
+      </div>
+      <div class="form-group">
+        <label for="txInput">Base station height (m) (AGL): </label>
+        <input type="text" id="txInput" size="4" ng-model="$ctrl.txHeight" ng-disabled="$ctrl.busy">
+      </div>
+      <div class="form-group">
+        <label for="rxInput">Node height (m) (AGL): </label>
+        <input type="text" id="rxInput" size="4" ng-model="$ctrl.rxHeight" ng-disabled="$ctrl.busy">
+      </div>
+      <div class="form-group">
+        <label for="itwomModel">ITWOM model: </label>
+        <select class="form-control"
+          id="itwomModelInput" name="itwomModelInput"
+          ng-model="$ctrl.itwomModel" ng-options="x for x in ['city','average']"
+          ng-disabled="$ctrl.busy">
+        </select>
+      </div>
+
+    </form>
+    <button type="submit" class="btn btn-default" ng-click="$ctrl.analyze()" ng-disabled="$ctrl.busy">Analyze the network</button>
+    <button type="submit" ng-show="$ctrl.overlay!=undefined" class="btn btn-default" ng-click="$ctrl.hideAnalyze()" ng-disabled="$ctrl.busy">{{$ctrl.showHideResultText}}</button>
+  </div>
+  <div role="tabpanel" class="tab-pane" id="coverage">
+    <h4>Coverage</h4>
+    <object ng-attr-data="{{$ctrl.coverage}}" type="application/pdf" width="100%" style="height: 100vh">
+    </object>
+  </div>
+  <div role="tabpanel" class="tab-pane" id="loss">
+    <h4>Loss</h4>
+    <object ng-attr-data="{{$ctrl.loss}}" type="application/pdf" width="100%" style="height: 100vh">
+    </object>
+  </div>
+</div> <!-- tab content -->

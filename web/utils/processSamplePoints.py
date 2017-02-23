@@ -140,7 +140,8 @@ def plot_shapes(ax, shapes, filled = False, show_states = False, fc=None, alpha=
 		for p in patches:
 			ax.add_patch(p)
 
-def evaluate_points(q, num_base, loss_threshold, pointdoc, bounds,
+def evaluate_points(q, num_base, basestations,
+	loss_threshold, pointdoc, bounds,
 	tx_height, rx_height,
 	run_id, itwomparam,
 	conn_str = 'mongodb://owner:fei6huM4@eg-mongodb.bucknell.edu/ym015',
@@ -155,20 +156,26 @@ def evaluate_points(q, num_base, loss_threshold, pointdoc, bounds,
 
 	elev = Elevation(srtm_path=srtm_path, mongo_str= None)
 
+	if basestations!=None:
+		num_base = len(basestations)
+
 	logging.info("{} evaluating points for {} bs (tx {} rx {}) -- {} points".format(
 			pid, num_base, tx_height, rx_height, len(pointdoc)))
 
 	for d in pointdoc:
-		olddocs = db['POINTRESULTS'].find({
-						'name': d['name'],
+		rdoc = {		'name': d['name'],
 						'point_docid': d['_id'],
 						'loss_threshold': loss_threshold,
 						'run': run_id,
+						'num_basestations': num_base,
 						'bounds': json_util.dumps(bounds),
 						'itwomparam': itwomparam.__dict__,
-						'num_basestations': num_base,
 						'tx_height': tx_height,
-						'rx_height': rx_height})
+						'rx_height': rx_height}
+		if basestations!= None:
+			rdoc['basestations'] = basestations
+
+		olddocs = db['POINTRESULTS'].find(rdoc)
 		dc = olddocs.count()
 		if dc > 1:
 			ods = [x['_id'] for x in olddocs]
@@ -177,7 +184,7 @@ def evaluate_points(q, num_base, loss_threshold, pointdoc, bounds,
 			db['POINTRESULTS'].remove({'_id': {'$in': ods[1:]}})
 			continue
 		if dc == 1:
-			logging.info("{} ({} bs) - {} done already".format(d['name'], num_base, d['_id']))
+			logging.info("{} - {} done already".format(d['name'], d['_id']))
 			for doc in olddocs:
 				q.put(doc)
 			continue
@@ -185,7 +192,9 @@ def evaluate_points(q, num_base, loss_threshold, pointdoc, bounds,
 		logging.info("{} processing points for {} ({} bs) (tx {} rx {}) -- {} points".format(
 			pid, d['name'], num_base, tx_height, rx_height, len(pointdoc)))
 		# select base station point(s)
-		basestations = random.sample(d['points'], num_base)
+
+		if basestations == None:
+			basestations = random.sample(d['points'], num_base)
 
 		# for b in basestations:
 		# 	if 'coordinates' not in b:
@@ -193,7 +202,7 @@ def evaluate_points(q, num_base, loss_threshold, pointdoc, bounds,
 
 		resultdoc = {
 			'name': d['name'],
-			'state': d['state'],
+
 			'area': d['area'],
 			'population': d['population'],
 			'point_docid': d['_id'],
@@ -210,6 +219,8 @@ def evaluate_points(q, num_base, loss_threshold, pointdoc, bounds,
 			'tx_height': tx_height,
 			'rx_height': rx_height
 			}
+		if 'state' in d:
+			resultdoc['state'] = d['state']
 		loss = []
 
 		# can't check this way we have multiple runs of the same point with diff. base locations.
@@ -220,14 +231,28 @@ def evaluate_points(q, num_base, loss_threshold, pointdoc, bounds,
 
 		connected = 0
 		disconnected = 0
+
+		# for b in basestations:
+		# 	if 'coordinates' not in b['geometry']:
+		# 		logging.info("no coordinates for {}".format(b))
+		#
+		# 		#convert gemoetry to geoJSON
+		#
+		# 		b['geometry'] = {'type': 'Point',
+		# 		 'coordinates': (b['geometry']['longitude'], b['geometry']['latitude'])}
+		#
+		# 		logging.info("added coordinates: {}".format(b['geometry']))
+
 		for p in d['points']:
 			if p in basestations:
 				#print("{} is a basestation".format(p))
 				continue
 			else:
 				# if 'coordinates' not in p:
+				# 	logging.info("no coordinates for {}".format(p))
 				# 	p['coordinates'] = shape(p['geometry']).coords[0]
-					# logging.info("added coordinates: {}".format(p['coordinates']))
+				# 	logging.info("added coordinates: {}".format(p['coordinates']))
+
 				#compute loss to all basestations, and save the lowest loss path
 				l = [point_loss(
 					(b['geometry']['coordinates'][0], b['geometry']['coordinates'][1]), tx_height,
@@ -279,7 +304,8 @@ def evaluate_points(q, num_base, loss_threshold, pointdoc, bounds,
 	connection.close()
 	logging.info("{} done.".format(pid))
 
-def AnalyzePoints(dbcon, connect_str, srtm_path, pointid, numBase = [1], numRuns = 1,
+def AnalyzePoints(dbcon, connect_str, srtm_path, pointid, numBase = None,
+	basestations=None, numRuns = 1,
 	freq = 915.0, txHeight=5, rxHeight=1, model='city', bounds=None,
 	lossThreshold = 148, **kwargs):
 
@@ -302,22 +328,29 @@ def AnalyzePoints(dbcon, connect_str, srtm_path, pointid, numBase = [1], numRuns
 	q = Queue()
 	jobs = []
 	pcount = 0
-	for run_id in range(int(numRuns)):
-		for num_base in numBase:
-			# while len(jobs) > 8:
-			# 	logging.info("waiting for: {}".format(jobs[0].name))
-			# 	jobs[0].join()
-			# 	logging.info("{} done.".format(jobs[0].name))
-			# 	del jobs[0]
-			pcount += 1
-			j = Process(target=evaluate_points,
-					args=(q, int(num_base), float(lossThreshold), r,
-						bounds,
-						float(txHeight), float(rxHeight),
-						run_id, itwomparam, connect_str, srtm_path),
-					name="{} {} basestations".format(pointid, num_base))
-			j.start()
-			jobs.append(j)
+
+	if basestations != None:
+		pcount += 1
+		j = Process(target=evaluate_points,
+				args=(q, None, basestations, float(lossThreshold), r,
+					bounds,
+					float(txHeight), float(rxHeight),
+					1, itwomparam, connect_str, srtm_path),
+				name="{} {} basestations".format(pointid, len(basestations)))
+		j.start()
+		jobs.append(j)
+	else:
+		for run_id in range(int(numRuns)):
+			for num_base in numBase:
+				pcount += 1
+				j = Process(target=evaluate_points,
+						args=(q, int(num_base), None, float(lossThreshold), r,
+							bounds,
+							float(txHeight), float(rxHeight),
+							run_id, itwomparam, connect_str, srtm_path),
+						name="{} {} basestations".format(pointid, num_base))
+				j.start()
+				jobs.append(j)
 
 	# must consume all results from the queue before joining the process.
 	res = []

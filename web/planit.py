@@ -13,4 +13,7 @@ bp_planitv1 = Blueprint('planit', __name__,
 @log
 @require_login
 def index():
-    return render_template('planitv1.html', user=session.get('token'))
+    return render_template('planitv1.html',
+        user=session.get('token'),
+        key=planitdb.get_or_create_webkey(session.get('token'),
+            request.remote_addr))

@@ -25,7 +25,7 @@ import inspect
 import time
 import pymongo
 
-from shapely.geometry import mapping, shape, Point, Polygon, MultiPolygon
+from shapely.geometry import mapping, shape, Point, Polygon, MultiPolygon, box
 
 import os
 
@@ -273,8 +273,9 @@ def analyze():
 
     args:
         pointid: object id of point set to use [required]
-        numBase: number of base stations (array) [required]
-        numRuns: number of simulation runs (int) [required]
+        numBase: number of base stations (array) [required if no basestations]
+        numRuns: number of simulation runs (int) [required if numBase]
+        basestations: the locations of base statiosn [requried if no numBase]
         freq: frequency MHz (float) [required]
         txHeight: transmitter height agl meters [required]
         rxHeight: transmitter reciever agl meters [required]
@@ -405,14 +406,24 @@ def sample():
                     result = cur.next()
                     result['pointid'] = str(result['_id'])
                     del result['_id']
-                    del result['args']
+                    #del result['args']
                     yield json_util.dumps(result)
+                    return
+            elif 'bounds' in args:
+                # planit samples from the gmaps bounds
+                logging.info("sampling from area: {}".format(args['bounds']))
+                b= args['bounds']
+                bbox = box(b['west'],  b['south'], b['east'], b['north'])
+                pbs = PopulationBasedPointSampler(db=db)
+                trshapes = list(pbs.get_tract_shapes_in_area(bbox))
+                name = json_util.dumps(b)
             else:
+                # cslpwan sampler uses state / cities / counties
                 pbs = PopulationBasedPointSampler(db=db)
                 trshapes = []
+                bbox = None
                 name = args['state']
                 if (len(args['cities'])> 0):
-
                     c = db['GENZ2010_160'].find({
                         'properties.STATE':args['state'],
                         'properties.LSAD': 'city',
@@ -421,9 +432,7 @@ def sample():
                         name += "-" + sh['properties']['NAME']
                         logging.info("getting tracts for {}".format(sh['properties']))
                         trshapes += pbs.get_tract_shapes_in_area(sh)
-
                 if (len(args['counties']) > 0):
-
                     c = db['GENZ2010_050'].find({
                         'properties.STATE':args['state'],
                         'properties.LSAD': 'County',
@@ -434,32 +443,46 @@ def sample():
                         trshapes += pbs.get_tract_shapes(
                             sh['properties']['STATE'],
                             sh['properties']['COUNTY'])
-
                 if len(trshapes) == 0:
                     # use the whole state
                     trshapes = list(pbs.get_shapes_for_state(args['state']))
 
-                logging.info("got {} tract shapes for {}".format(len(trshapes), name))
+            logging.info("got {} tract shapes".format(len(trshapes)))
 
-                for i, sh in enumerate(trshapes):
-                    logging.info("tract shape {}: {}".format(i, sh['properties']))
-                result ={
-                    'args': args,
-                    'name': name,
-                    'state': args['state'],
-                    'points': [{
-                        'geometry':mapping(p),
-                        'id': 'point_{}'.format(i)} for i,p in
-                            enumerate(pbs.sample(args['count'], trshapes))],
-                    'population': sum([t['properties']['population']['effective'] for t in trshapes]),
-                    'area': sum(t['properties']['area']['effective'] for t in trshapes)
-                }
+            for i, sh in enumerate(trshapes):
+                logging.info("tract shape {}: {}".format(i, sh['properties']))
 
-                db.POINTS.insert(result)
-                result['pointid'] = str(result['_id'])
-                del result['_id']
-                del result['args']
-                yield json_util.dumps(result)
+            result = {
+                'args': args,
+                'name': name,
+
+
+                'population': sum([t['properties']['population']['effective'] for t in trshapes]),
+                'area': sum(t['properties']['area']['effective'] for t in trshapes)
+            }
+            if bbox !=None:
+                result['points'] = [{
+                    'geometry':mapping(p),
+                    'id': 'point_{}'.format(i)} for i,p in
+                        enumerate(pbs.sample(
+                            args['count'], trshapes,
+                            intersect=True))]
+            else:
+                # using state/county/city there is no bounding box.
+                result['points'] = [{
+                    'geometry':mapping(p),
+                    'id': 'point_{}'.format(i)} for i,p in
+                        enumerate(pbs.sample(args['count'], trshapes))]
+
+            if 'basestations' in args:
+                result['basestations'] = args['basestations']
+            if 'state' in args:
+                result['state'] = args['state']
+            db.POINTS.insert(result)
+            result['pointid'] = str(result['_id'])
+            del result['_id']
+            #del result['args']
+            yield json_util.dumps(result)
 
     return Response(async(planitdb.mongo.db, args), mimetype='application/json')
 
