@@ -264,6 +264,11 @@ angular.module("lpwanApp")
                         if (me.basestations.length==1){
                           me.map.fitPoints = false;
                           //me.map.center = $.extend({}, marker.geometry);
+                          var cobj = {
+                            latitude: marker.geometry.coordinates[1],
+                            longitude: marker.geometry.coordinates[0]};
+                          console.log(cobj)
+                          me.map.center = cobj;
                           me.map.zoom = 9;
                         }else{
                           me.map.fitPoints = true;
@@ -328,23 +333,37 @@ angular.module("lpwanApp")
                         console.log(model);
                         console.log(args);
 
-                        me.circles[model.id].setMap(null);
-                        delete me.circles[model.id];
-
-                        $location.search('pointid', null);
-                        $location.search('analysisid', null);
-                        if ('overlay' in me){
-                          me.overlay.setMap(null);
-                          delete me.overlay;
-                          delete me.coverage;
-                          delete me.loss;
+                        var midex = null;
+                        for (var i=0; i<me.basestations.length; i++){
+                          if (me.basestations[i].id == model.id){
+                            //console.log("FOUND MODEL");
+                            midex = i;
+                          }
                         }
-                        me.points = [];
-                        $('.nav-tabs a[data-target="#basestations"]').tab('show');
+                        if (midex == null){
+                          console.log("basestation not found!");
+                        }else{
+                          me.circles[model.id].setMap(null);
+                          delete me.circles[model.id];
 
-                        model.geometry.coordinates = [args[0].latLng.lng(),
-                          args[0].latLng.lat()]
-                        me.addCircle(me.map.control.getGMap(), model);
+                          $location.search('pointid', null);
+                          $location.search('analysisid', null);
+                          if ('overlay' in me){
+                            me.overlay.setMap(null);
+                            delete me.overlay;
+                            delete me.coverage;
+                            delete me.loss;
+                          }
+                          me.points = [];
+                          $('.nav-tabs a[data-target="#basestations"]').tab('show');
+
+                          model.geometry.coordinates = [args[0].latLng.lng(),
+                            args[0].latLng.lat()];
+
+                          me.basestations[midex] = $.extend({}, model);
+                          console.log(me.basestations[midex]);
+                          me.addCircle(me.map.control.getGMap(), me.basestations[midex]);
+                        }
                       })
                     },
                     click: function(marker, eventName, model, args){

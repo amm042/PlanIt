@@ -485,6 +485,15 @@ def sample():
                 'population': sum([t['properties']['population']['effective'] for t in trshapes]),
                 'area': sum(t['properties']['area']['effective'] for t in trshapes)
             }
+            if 'basestations' in args:
+                result['basestations'] = args['basestations']
+            if 'state' in args:
+                result['state'] = args['state']
+
+            logging.info("results, prio to sample: {}".format(result))
+
+
+
             if bbox !=None:
                 logging.info("have bbox, using intersect")
                 result['points'] = [{
@@ -492,8 +501,7 @@ def sample():
                     'title': str(list(p.coords)[0]),
                     'id': 'point_{}'.format(i)} for i,p in
                         enumerate(pbs.sample(
-                            args['count'], trshapes,
-                            intersect=True))]
+                            args['count'], trshapes, intersect=True))]
             else:
                 # using state/county/city there is no bounding box.
                 result['points'] = [{
@@ -502,10 +510,7 @@ def sample():
                     'id': 'point_{}'.format(i)} for i,p in
                         enumerate(pbs.sample(args['count'], trshapes))]
 
-            if 'basestations' in args:
-                result['basestations'] = args['basestations']
-            if 'state' in args:
-                result['state'] = args['state']
+
             db.POINTS.insert(result)
             result['pointid'] = str(result['_id'])
             del result['_id']
