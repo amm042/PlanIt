@@ -497,7 +497,6 @@ angular.module("lpwanApp")
 
       } // sample points
       me.showAnalyzeResult = function(response){
-
           if (response.data.complete){
             console.log("got analyzeResult [complete].");
             console.log(response);
@@ -541,12 +540,14 @@ angular.module("lpwanApp")
               key: me.key,
               jobid: me.analyzeResponse.jobid,
               id: me.analyzeResponse.id}).then(
-                me.showAnalyzeResult
-              }, function fail(response){
-                me.busy = false
-                console.log("failed to get analyzeResult.");
-                console.log(response);
-              });
+                function success(response){
+                  me.showAnalyzeResult(response);
+                },
+                function fail(response){
+                  me.busy = false
+                  console.log("failed to get analyzeResult.");
+                  console.log(response);
+                });
         };//checkAnalyzeResult
       me.hideAnalyze = function(){
         if (me.overlay.getMap() != null){
