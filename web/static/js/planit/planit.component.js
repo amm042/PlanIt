@@ -496,50 +496,52 @@ angular.module("lpwanApp")
           });
 
       } // sample points
+      me.showAnalyzeResult = function(response){
 
+          if (response.data.complete){
+            console.log("got analyzeResult [complete].");
+            console.log(response);
+            me.busy = false
+
+            // remove any existing overlays.
+            if (me.overlay != undefined){
+              me.overlay.setMap(null);
+              delete me.overlay;
+              delete me.coverage;
+              delete me.loss;
+            }
+
+            $location.search('analysisid', response.data.id);
+            me.coverage = response.data.coverage
+            me.loss = response.data.loss
+
+            for (var i=0; i<me.basestations.length; i++){
+              me.circles[me.basestations[i].id].setOptions({fillOpacity: 0.05});
+            }
+
+            var gmap = me.map.control.getGMap();
+
+            me.overlay = new google.maps.GroundOverlay(
+              response.data.contour,
+              response.data.args.bounds,
+              {opacity: 0.5}
+            )
+            me.overlay.setMap(gmap);
+            me.showHideResultText= 'Hide';
+            me.show.points = false;
+            me.showHideButtonText = 'Show';
+          }else{
+            console.log("got analyzeResult [NOT complete].");
+            console.log(response);
+            $timeout(me.checkAnalyzeResult, 100);
+          }
+      } // showAnalyzeResult
       me.checkAnalyzeResult = function(){
           $http.post(me.apiprefix + 'analyzeResult', {
               key: me.key,
               jobid: me.analyzeResponse.jobid,
-              id: me.analyzeResponse.id}).then(function success(response){
-                if (response.data.complete){
-                  console.log("got analyzeResult [complete].");
-                  console.log(response);
-                  me.busy = false
-
-                  // remove any existing overlays.
-                  if (me.overlay != undefined){
-                    me.overlay.setMap(null);
-                    delete me.overlay;
-                    delete me.coverage;
-                    delete me.loss;
-                  }
-
-                  $location.search('analysisid', response.data.id);
-                  me.coverage = response.data.coverage
-                  me.loss = response.data.loss
-
-                  for (var i=0; i<me.basestations.length; i++){
-                    me.circles[me.basestations[i].id].setOptions({fillOpacity: 0.05});
-                  }
-
-                  var gmap = me.map.control.getGMap();
-
-                  me.overlay = new google.maps.GroundOverlay(
-                    response.data.contour,
-                    response.data.args.bounds,
-                    {opacity: 0.5}
-                  )
-                  me.overlay.setMap(gmap);
-                  me.showHideResultText= 'Hide';
-                  me.show.points = false;
-                  me.showHideButtonText = 'Show';
-                }else{
-                  console.log("got analyzeResult [NOT complete].");
-                  console.log(response);
-                  $timeout(me.checkAnalyzeResult, 100);
-                }
-
+              id: me.analyzeResponse.id}).then(
+                me.showAnalyzeResult
               }, function fail(response){
                 me.busy = false
                 console.log("failed to get analyzeResult.");
@@ -588,25 +590,7 @@ angular.module("lpwanApp")
           me.analyzeResponse = response.data;
 
           if (me.analyzeResponse.complete){
-            me.busy = false
-
-            me.coverage = response.data.coverage
-            me.loss = response.data.loss
-            $location.search('analysisid', response.data.id);
-            // remove any existing overlays.
-            if (me.overlay != undefined){
-              me.overlay.setMap(null);
-              delete me.overlay;
-              delete me.coverage;
-              delete me.loss;
-            }
-
-            me.overlay = new google.maps.GroundOverlay(
-              response.data.contour,
-              bounds,
-              {opacity: 0.5}
-            )
-            me.overlay.setMap(gmap);
+            me.showAnalyzeResult(response);
           }else{
             $timeout(me.checkAnalyzeResult, 100);
           }
