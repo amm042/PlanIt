@@ -156,6 +156,9 @@ def evaluate_points(q, num_base, basestations,
 
 	elev = Elevation(srtm_path=srtm_path, mongo_str= None)
 
+	# for distance calc.
+	geod = Geod(ellps='WGS84')
+
 	if basestations!=None:
 		num_base = len(basestations)
 
@@ -254,13 +257,29 @@ def evaluate_points(q, num_base, basestations,
 				# 	logging.info("added coordinates: {}".format(p['coordinates']))
 
 				#compute loss to all basestations, and save the lowest loss path
-				l = [point_loss(
+				l = [(i,)+ point_loss(
 					(b['geometry']['coordinates'][0], b['geometry']['coordinates'][1]), tx_height,
 					(p['geometry']['coordinates'][0], p['geometry']['coordinates'][1]), rx_height,
-					params=itwomparam, elev=elev)[0] for b in basestations]
+					params=itwomparam, elev=elev) for i,b in enumerate(basestations)]
 
-				min_loss = min(l)
+				logging.info("raw l is: {}".format(l))
+				l=sorted(l, key=lambda x:x[1])
+				logging.info("sorted l is: {}".format(l))
+				min_loss = l[0][1]
+				strmode = l[0][2]
 				loss.append(min_loss)
+
+				# az/distance to strongest base station
+				az12, az21, dist = geod.inv(
+					*basestations[l[0][0]]['geometry']['coordinates'],
+					*p['geometry']['coordinates']
+				)
+
+				logging.info("loss for {} to {} is: {}, min_loss: {}, distance: {}m".format(
+					", ".join([str(b['geometry']['coordinates']) for b in basestations]),
+					p['geometry']['coordinates'],
+					l, min_loss, dist
+				))
 
 				if min_loss < loss_threshold:
 					connected += 1
@@ -270,6 +289,10 @@ def evaluate_points(q, num_base, basestations,
 				resultdoc['nodes'].append(
 					{'point':p,
 					'loss': l,
+					'mode': strmode,
+					'bs_az': az12,
+					'pt_az': az21,
+					'distance': dist,
 					'min_loss': min_loss,
 					'connected': min_loss < loss_threshold})
 		if bounds != None:

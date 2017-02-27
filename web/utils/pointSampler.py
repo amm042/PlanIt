@@ -80,6 +80,21 @@ class PopulationBasedPointSampler():
 		self.col = self.db['GENZ2010_140']
 		self.census_col = self.db['CENSUS2010_SF1']
 
+	def get_circle(self, center, distance_meters, sides=32):
+		""""
+		construct a circle on the earths surface distance_meters from center
+
+		center is a shapely shape
+		distance_meters is an integer
+		"""
+		pts = []
+		for az in np.arange (0,360, 360/sides):
+			elon, elat, eaz = self.geod.fwd(center.centroid.x, center.centroid.y, az, distance_meters)
+			pts.append( (elon, elat) )
+
+		return Polygon(pts)
+
+
 
 	def get_coverage(self, longitude = -76.881304, latitude = 40.954910,  max_distance_meters = 15 * 1000, sides=64):
 

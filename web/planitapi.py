@@ -408,7 +408,34 @@ def sample():
                     del result['_id']
                     #del result['args']
                     yield json_util.dumps(result)
-                    return
+
+                else:
+                    yield json_util.dumps({"error":"invalid pointid."}, 406)
+                return
+            elif 'basestations' in args:
+                # basestations takes priorty over bounds
+                # these are json points + radius in meters, this defines the
+                # sample area
+                logging.info("sampling from basesations + radius: {}".format(args['basestations']))
+                pbs = PopulationBasedPointSampler(db=db)
+                trshapes = []
+                names = []
+                bbox = None
+                for bs in args['basestations']:
+
+                    #area = shape(bs['geometry']).buffer(1000*bs['radius'])
+                    area = pbs.get_circle(shape(bs['geometry']), 1000*bs['radius'])
+                    #logging.info("constructed area: {}".format(area))
+                    if bbox == None:
+                        bbox = area
+                    else:
+                        bbox.union(area)
+
+                    #trshapes += list(pbs.get_shapes(area, 1000*bs['radius']))
+                    trshapes += list(pbs.get_tract_shapes_in_area(area))
+                    names.append("{},{},{}".format(area.centroid.x, area.centroid.y, bs['radius']))
+
+                name = ", ".join(names)
             elif 'bounds' in args:
                 # planit samples from the gmaps bounds
                 logging.info("sampling from area: {}".format(args['bounds']))
@@ -455,14 +482,14 @@ def sample():
             result = {
                 'args': args,
                 'name': name,
-
-
                 'population': sum([t['properties']['population']['effective'] for t in trshapes]),
                 'area': sum(t['properties']['area']['effective'] for t in trshapes)
             }
             if bbox !=None:
+                logging.info("have bbox, using intersect")
                 result['points'] = [{
                     'geometry':mapping(p),
+                    'title': str(list(p.coords)[0]),
                     'id': 'point_{}'.format(i)} for i,p in
                         enumerate(pbs.sample(
                             args['count'], trshapes,
@@ -471,6 +498,7 @@ def sample():
                 # using state/county/city there is no bounding box.
                 result['points'] = [{
                     'geometry':mapping(p),
+                    'title': str(list(p.coords)[0]),
                     'id': 'point_{}'.format(i)} for i,p in
                         enumerate(pbs.sample(args['count'], trshapes))]
 

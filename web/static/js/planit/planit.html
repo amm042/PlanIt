@@ -15,7 +15,7 @@
   zoom='$ctrl.map.zoom' bounds='$ctrl.map.bounds'
   control='$ctrl.map.control'
   events='$ctrl.map.events'
-  options='{disableDoubleClickZoom:true}'
+  options='$ctrl.map.options'
   style='height: 400px'>
   <!-- parentdiv='mapSearchInput' -->
 
@@ -31,7 +31,11 @@
     models="$ctrl.points"
     fit="$ctrl.map.fitPoints"
     type="spider"
+    events='$ctrl.map.pointEvents'
     coords="'geometry'">
+    <ui-gmap-windows show="show">
+      <div ng-non-bindable>{{title}}</div>
+    </ui-gmap-windows>
   </ui-gmap-markers>
 
   <ui-gmap-markers ng-if="$ctrl.show.basestations"
@@ -64,7 +68,7 @@
     <form class="form-inline">
       <div class="form-group">
         <label for="radiusInput">Coverage radius (km): </label>
-        <input type="text" id="radiusInput" size="5" ng-model="$ctrl.radius" ng-disabled="$ctrl.busy">
+        <input type="number" id="radiusInput" size="5" ng-model="$ctrl.radius" ng-disabled="$ctrl.busy">
       </div>
     </form>
 
@@ -72,7 +76,8 @@
       <tr ng-repeat="base in $ctrl.basestations" class="{{base.active}}">
         <td><span class="glyphicon glyphicon-remove-circle" ng-click="$ctrl.removeBase($index)"></span></td>
         <td>{{base.id}}</td>
-        <td>{{base.latlng}}</td>
+        <td>{{base.geometry.coordinates}}</td>
+        <td><form class='form-inline'><input type="number" style="width: 3em" ng-model='base.radius' ng-change='$ctrl.rebuildCircles()'> km</form></td>
         <td>{{base.name}}</td>
         <td>{{base.address}}</td>
       </tr>
@@ -90,7 +95,7 @@
         </select>
         <button type="submit" class="btn btn-default" ng-hide="$ctrl.points.length>0" ng-click="$ctrl.samplePoints(true)" ng-disabled="$ctrl.busy">Sample</button>
         <button type="submit" class="btn btn-default" ng-show="$ctrl.points.length>0" ng-click="$ctrl.samplePoints(true)" ng-disabled="$ctrl.busy">Resample</button>
-        <button type="submit" class="btn btn-default" ng-click="$ctrl.hideSamplePoints()" ng-disabled="$ctrl.busy">{{$ctrl.showHideButtonText}}</button>
+        <button type="submit" class="btn btn-default" ng-show="$ctrl.points.length>0" ng-click="$ctrl.hideSamplePoints()" ng-disabled="$ctrl.busy">{{$ctrl.showHideButtonText}}</button>
       </div>
     </form>
   </div>

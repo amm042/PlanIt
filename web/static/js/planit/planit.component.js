@@ -101,12 +101,15 @@ angular.module("lpwanApp")
           place_id: place.place_id,
           name: place.name,
           address: place.formatted_address,
+
           geometry:{ // GeoJSON
             type: 'Point',
             coordinates:[place.geometry.location.lng(), place.geometry.location.lat()]
             },
-          ll: place.geometry.location,
-          latlng: place.geometry.location.toString()
+          radius: me.radius,
+          //ll: $.extend({}, place.geometry.location),
+          //ll: place.geometry.location.toJSON(),
+          //latlng: place.geometry.location.toString()
         };
         return marker;
       } // placeToMaker
@@ -114,16 +117,17 @@ angular.module("lpwanApp")
         if (!mevt || mevt == 'undefined' ) {
           return;
         }
-
         var marker = {
           id: id,
           active: 'active',
+
           geometry:{ // GeoJSON
             type: 'Point',
             coordinates:[mevt.latLng.lng(), mevt.latLng.lat()]
             },
-          ll: mevt.latLng,
-          latlng: mevt.latLng.toString()
+          radius: me.radius,
+          //ll: mevt.latLng.toJSON(),
+          //latlng: mevt.latLng.toString()
         };
         return marker;
       } // mouseEventToMarker
@@ -133,27 +137,34 @@ angular.module("lpwanApp")
 
         me.basestations.splice(idx, 1);
         if (me.basestations.length==1){
-          me.map.fitPoints = false;
-          me.map.center = $.extend({}, me.basestations[0].geometry);
+          me.map.fitPoints = true;
+          //me.map.center = $.extend({}, me.basestations[0].geometry);
           me.map.zoom = 9;
         }else{
           me.map.fitPoints = true;
         }
       }//removeBase
       me.removeAllBase = function(){
-        for (var i=0; i<me.basestations.length; i++){
-          me.circles[me.basestations[i].id].setMap(null);
+        // for (var i=0; i<me.basestations.length; i++){
+        //   me.circles[me.basestations[i].id].setMap(null);
+        // }
+        for (var c in me.circles){
+          me.circles[c].setMap(null);
         }
         me.circles = [];
         me.basestations = [];
         me.map.fitPoints = false;
+        me.baseid = 0;
         //me.map.center = $.extend({}, marker.geometry);
         //me.map.zoom = 14;
       }//
       me.addCircle = function(gmap, marker){
         //add coverage circle to gmap using given marker
+        //console.log("ll is");
+        //console.log(marker.ll);
         var c = new google.maps.Circle({
-          center: marker.ll,
+          center: {lng: marker.geometry.coordinates[0],
+            lat: marker.geometry.coordinates[1]},
           clickable: false,
           draggable: false,
           fillOpacity: 0.2,
@@ -162,10 +173,42 @@ angular.module("lpwanApp")
           strokeWeight: 1,
           map: gmap,
           visible: true,
-          radius: me.radius*1000,
+          radius: marker.radius*1000,
         })
         me.circles[marker.id] = c;
         //marker.circle = c
+      }
+      me.rebuildCircles = function(){
+        // when something changes with the coverage circles and they
+        // need to be rebuilt.
+
+        // first remove all circles.
+        for (var c in me.circles){
+          me.circles[c].setMap(null);
+        }
+        me.circles = [];
+
+        // and rebuild.
+        for (var i=0; i<me.basestations.length; i++){
+          console.log("rebuild base station "+me.basestations[i].id);
+          console.log(me.basestations[i]);
+          me.addCircle(me.map.control.getGMap(), me.basestations[i]);
+          if (me.basestations[i].id >= me.baseid){
+            me.baseid = me.basestations[i].id+1;
+          }
+        }
+
+        // make sure we clear any points generated from old circles.
+        $location.search('pointid', null);
+        $location.search('analysisid', null);
+        if ('overlay' in me){
+          me.overlay.setMap(null);
+          delete me.overlay;
+          delete me.coverage;
+          delete me.loss;
+        }
+        me.points = [];
+        $('.nav-tabs a[data-target="#basestations"]').tab('show');
       }
       me.$onInit = function(){
         console.log("planitController onInit:");
@@ -193,6 +236,10 @@ angular.module("lpwanApp")
                   pan: true,
                   fitPoints: false,
                   control: {},
+                  options: {
+                    disableDoubleClickZoom:true,
+                    fullscreenControl:true,
+                  },
                   events:{
                     dblclick: function(gmap, eventName, args){
                       $scope.$apply(function() {
@@ -202,10 +249,21 @@ angular.module("lpwanApp")
                           me.basestations[i].active = '';
                         }
                         me.basestations.push(marker);
+                        $location.search('pointid', null);
+                        $location.search('analysisid', null);
+                        if ('overlay' in me){
+                          me.overlay.setMap(null);
+                          delete me.overlay;
+                          delete me.coverage;
+                          delete me.loss;
+                        }
+                        me.points = [];
+                        $('.nav-tabs a[data-target="#basestations"]').tab('show');
+
                         console.log("map dblclick");
                         if (me.basestations.length==1){
                           me.map.fitPoints = false;
-                          me.map.center = $.extend({}, marker.geometry);
+                          //me.map.center = $.extend({}, marker.geometry);
                           me.map.zoom = 9;
                         }else{
                           me.map.fitPoints = true;
@@ -227,10 +285,25 @@ angular.module("lpwanApp")
                         me.basestations[i].active = '';
                       }
                       me.basestations.push(marker)
+                      $location.search('pointid', null);
+                      $location.search('analysisid', null);
+                      if ('overlay' in me){
+                        me.overlay.setMap(null);
+                        delete me.overlay;
+                        delete me.coverage;
+                        delete me.loss;
+                      }
+                      me.points = [];
+                      $('.nav-tabs a[data-target="#basestations"]').tab('show');
 
                       if (me.basestations.length==1){
                         me.map.fitPoints = false;
-                        me.map.center = $.extend({}, marker.geometry);
+                        //me.map.center = $.extend({}, marker.geometry);
+                        var cobj = {
+                          latitude: marker.geometry.coordinates[1],
+                          longitude: marker.geometry.coordinates[0]};
+                        console.log(cobj)
+                        me.map.center = cobj;
                         me.map.zoom = 9;
                       }else{
                         me.map.fitPoints = true;
@@ -238,7 +311,16 @@ angular.module("lpwanApp")
                       console.log(me.basestations);
                     }
                   }, // map.serchEvents
-                  markerEvents: {
+                  pointEvents: {  // these are sample points
+                    click: function(marker, eventName, model, args){
+                      console.log("marker click " + model.geometry);
+                      console.log(model);
+                      console.log(args);
+                      model.show = !model.show; //show / hide info window
+
+                    }
+                  }, // pointEvents
+                  markerEvents: { // these are for base stations
                     dragend: function(marker, eventName, model, args){
                       $scope.$apply(function() {
                         console.log("marker dragend");
@@ -249,15 +331,27 @@ angular.module("lpwanApp")
                         me.circles[model.id].setMap(null);
                         delete me.circles[model.id];
 
-                        model.latlng = args[0].latLng.toString();
-                        model.ll = args[0].latLng;
+                        $location.search('pointid', null);
+                        $location.search('analysisid', null);
+                        if ('overlay' in me){
+                          me.overlay.setMap(null);
+                          delete me.overlay;
+                          delete me.coverage;
+                          delete me.loss;
+                        }
+                        me.points = [];
+                        $('.nav-tabs a[data-target="#basestations"]').tab('show');
+
+                        model.geometry.coordinates = [args[0].latLng.lng(),
+                          args[0].latLng.lat()]
                         me.addCircle(me.map.control.getGMap(), model);
                       })
                     },
                     click: function(marker, eventName, model, args){
-                      console.log("marker click " + args[0].latLng.toString());
+                      console.log("marker click " + model.geometry);
                       console.log(model);
                       console.log(args);
+                      model.show = !model.show; //show / hide info window
                       for (var i=0; i< me.basestations.length; i++){
                         me.basestations[i].active = '';
                       }
@@ -267,7 +361,7 @@ angular.module("lpwanApp")
 
                 }; // map
 
-        me.sampleSize = 500;
+        me.sampleSize = 100;
 
         me.numRuns = 2;
         me.basestations = [];
@@ -275,7 +369,7 @@ angular.module("lpwanApp")
         me.lossThreshold = 148;
         me.txHeight = 5;
         me.rxHeight = 1;
-        me.itwomModel = 'city';
+        me.itwomModel = 'average';
 
         me.loaderImg = 'static/img/ajax-transparent.gif';
         if('pointid' in $location.search()){
@@ -317,8 +411,8 @@ angular.module("lpwanApp")
           var bounds = gmap.getBounds();
         }
         console.log('sampling ' + me.sampleSize + ' points.');
-        console.log("search is");
-        console.log($location.search());
+        //console.log("search is");
+        //console.log($location.search());
         me.busy = true
         $http.post(me.apiprefix + 'sample', {
             pointid: $location.search().pointid,
@@ -331,38 +425,53 @@ angular.module("lpwanApp")
             me.busy = false;
 
             console.log(response.data);
-            if ('basestations' in response.data){
-              me.map.fitPoints = true;
-              me.basestations = response.data.basestations;
-              me.show.basestations = true;
-              me.baseid= me.basestations.length;
+            if ('data' in response){
+              if ('basestations' in response.data){
+                me.map.fitPoints = true;
+                console.log("set basestations from response ");
+                console.log(response.data.basestations);
+                me.removeAllBase();
+                me.basestations = response.data.basestations;
+                me.baseid = 0;
+                me.rebuildCircles();
+
+                me.show.basestations = true;
+                //me.baseid= me.basestations.length;
+              }
+              if ('pointid' in response.data){
+                console.log("point id is " + response.data.pointid.toString());
+                me.map.fitPoints = true;
+                me.show.points = true;
+                me.showHideButtonText = 'Hide';
+                me.points = response.data.points;
+                $location.search('pointid', response.data.pointid.toString());
+              }else{
+                $location.search('pointid',null);
+              }
+              /*
+              if ('getGMap' in me.map.control){
+                // use bounds to fit map if we have it.
+                me.map.fitPoints = false;
+                var gmap = me.map.control.getGMap();
+                console.log('set bounds to:');
+                console.log(response.data.args.bounds);
+                //gmap.fitBounds(response.data.args.bounds);
+                var b = response.data.args.bounds;
+                myFitBounds(gmap, new google.maps.LatLngBounds(
+                  {lat:b.north, lng:b.west}, {lat:b.south, lng:b.east}));
+                console.log('bounds are:');
+                console.log(gmap.getBounds().toString());
+              }
+            */
+              $('.nav-tabs a[data-target="#analyze"]').tab('show');
+            }else{
+              // no/empty response.
+              console.log("empty response");
+              $location.search('pointid', null);
             }
-            if ('pointid' in response.data){
-              console.log("point id is " + response.data.pointid.toString());
-              me.map.fitPoints = true;
-              me.show.points = true;
-              me.showHideButtonText = 'Hide';
-              me.points = response.data.points;
-              $location.search('pointid', response.data.pointid.toString());
-            }
-            /*
-            if ('getGMap' in me.map.control){
-              // use bounds to fit map if we have it.
-              me.map.fitPoints = false;
-              var gmap = me.map.control.getGMap();
-              console.log('set bounds to:');
-              console.log(response.data.args.bounds);
-              //gmap.fitBounds(response.data.args.bounds);
-              var b = response.data.args.bounds;
-              myFitBounds(gmap, new google.maps.LatLngBounds(
-                {lat:b.north, lng:b.west}, {lat:b.south, lng:b.east}));
-              console.log('bounds are:');
-              console.log(gmap.getBounds().toString());
-            }
-          */
-            $('.nav-tabs a[data-target="#analyze"]').tab('show');
           }, function fail(response){
             me.busy = false;
+            $location.search('pointid', null);
             console.log("FAIL");
             console.log(response);
           });
@@ -379,14 +488,20 @@ angular.module("lpwanApp")
                   console.log(response);
                   me.busy = false
 
-                  $location.search('analysisid', response.data.id);
-                  me.coverage = response.data.coverage
-                  me.loss = response.data.loss
-
                   // remove any existing overlays.
                   if (me.overlay != undefined){
                     me.overlay.setMap(null);
                     delete me.overlay;
+                    delete me.coverage;
+                    delete me.loss;
+                  }
+
+                  $location.search('analysisid', response.data.id);
+                  me.coverage = response.data.coverage
+                  me.loss = response.data.loss
+
+                  for (var i=0; i<me.basestations.length; i++){
+                    me.circles[me.basestations[i].id].setOptions({fillOpacity: 0.05});
                   }
 
                   var gmap = me.map.control.getGMap();
@@ -398,6 +513,8 @@ angular.module("lpwanApp")
                   )
                   me.overlay.setMap(gmap);
                   me.showHideResultText= 'Hide';
+                  me.show.points = false;
+                  me.showHideButtonText = 'Show';
                 }else{
                   console.log("got analyzeResult [NOT complete].");
                   console.log(response);
@@ -414,10 +531,16 @@ angular.module("lpwanApp")
         if (me.overlay.getMap() != null){
           me.overlay.setMap(null);
           me.showHideResultText = 'Show';
+          for (var i=0; i<me.basestations.length; i++){
+            me.circles[me.basestations[i].id].setOptions({fillOpacity: 0.2});
+          }
         }else{
           var gmap = me.map.control.getGMap();
           me.overlay.setMap(gmap);
           me.showHideResultText = 'Hide';
+          for (var i=0; i<me.basestations.length; i++){
+            me.circles[me.basestations[i].id].setOptions({fillOpacity: 0.01});
+          }
         }
       }//clearAnalyze
       me.analyze = function(){
@@ -455,6 +578,8 @@ angular.module("lpwanApp")
             if (me.overlay != undefined){
               me.overlay.setMap(null);
               delete me.overlay;
+              delete me.coverage;
+              delete me.loss;
             }
 
             me.overlay = new google.maps.GroundOverlay(

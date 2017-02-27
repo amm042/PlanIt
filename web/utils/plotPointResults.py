@@ -23,6 +23,8 @@ import random
 
 from bson import ObjectId
 from types import SimpleNamespace
+
+import logging
 def plot_contours(area, points, fig, ax, plot_legend= True, plot_points= True,
 	threshold = 180):
 
@@ -32,8 +34,8 @@ def plot_contours(area, points, fig, ax, plot_legend= True, plot_points= True,
 
 	x,y,z  = zip(*points)
 	X,Y = np.mgrid[xmin:xmax:((xmax-xmin)/250), ymin:ymax:((ymax-ymin)/250)]
-	Z = griddata( (x,y), z, (X,Y), method='cubic')
-	#Z = griddata( (x,y), z, (X,Y), method='linear')
+	#Z = griddata( (x,y), z, (X,Y), method='cubic')
+	Z = griddata( (x,y), z, (X,Y), method='linear')
 
 	mindb = threshold-100
 	maxdb = threshold
@@ -157,6 +159,8 @@ def PlotContours(resdocs, bounds, threshold, out_path, fname):
 					points[l] += [x['min_loss']]
 				else:
 					points[l] = [x['min_loss']]
+
+	#logging.info(points);
 
 	points = [(k[0], k[1], float(np.mean(v))) for k,v in points.items() ]
 
