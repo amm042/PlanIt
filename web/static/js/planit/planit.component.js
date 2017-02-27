@@ -137,8 +137,13 @@ angular.module("lpwanApp")
 
         me.basestations.splice(idx, 1);
         if (me.basestations.length==1){
-          me.map.fitPoints = true;
-          //me.map.center = $.extend({}, me.basestations[0].geometry);
+          me.map.fitPoints = false;
+          //me.map.center = $.extend({}, marker.geometry);
+          var cobj = {
+            latitude: me.basestations[0].geometry.coordinates[1],
+            longitude: me.basestations[0].geometry.coordinates[0]};
+          console.log(cobj)
+          me.map.center = cobj;
           me.map.zoom = 9;
         }else{
           me.map.fitPoints = true;
@@ -334,10 +339,14 @@ angular.module("lpwanApp")
                         console.log(args);
 
                         var midex = null;
+            
                         for (var i=0; i<me.basestations.length; i++){
                           if (me.basestations[i].id == model.id){
                             //console.log("FOUND MODEL");
                             midex = i;
+                            me.basestations[i].active = 'active';
+                          }else{
+                            me.basestations[i].active = '';
                           }
                         }
                         if (midex == null){
@@ -372,9 +381,14 @@ angular.module("lpwanApp")
                       console.log(args);
                       model.show = !model.show; //show / hide info window
                       for (var i=0; i< me.basestations.length; i++){
-                        me.basestations[i].active = '';
+                        if (me.basesations[i].id == model.id){
+                          me.basestations[i].active = 'active';
+                        }
+                        else{
+                          me.basestations[i].active = '';
+                        }
                       }
-                      model.active= 'active';
+
                     }
                   }// map.markerEvents
 
