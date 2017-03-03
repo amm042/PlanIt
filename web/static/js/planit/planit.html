@@ -93,9 +93,12 @@
           ng-model="$ctrl.sampleSize" ng-options="x for x in [100,500,1000]"
           ng-disabled="$ctrl.busy">
         </select>
-        <button type="submit" class="btn btn-default" ng-hide="$ctrl.points.length>0" ng-click="$ctrl.samplePoints(true)" ng-disabled="$ctrl.busy">Sample</button>
-        <button type="submit" class="btn btn-default" ng-show="$ctrl.points.length>0" ng-click="$ctrl.samplePoints(true)" ng-disabled="$ctrl.busy">Resample</button>
-        <button type="submit" class="btn btn-default" ng-show="$ctrl.points.length>0" ng-click="$ctrl.hideSamplePoints()" ng-disabled="$ctrl.busy">{{$ctrl.showHideButtonText}}</button>
+        <button type="submit" class="btn btn-default" ng-hide="$ctrl.points.length>0"
+          analytics-on ng-click="$ctrl.samplePoints(true)" ng-disabled="$ctrl.busy">Sample</button>
+        <button type="submit" class="btn btn-default" ng-show="$ctrl.points.length>0"
+          analytics-on ng-click="$ctrl.samplePoints(true)" ng-disabled="$ctrl.busy">Resample</button>
+        <button type="submit" class="btn btn-default" ng-show="$ctrl.points.length>0"
+          ng-click="$ctrl.hideSamplePoints()" ng-disabled="$ctrl.busy">{{$ctrl.showHideButtonText}}</button>
       </div>
     </form>
   </div>
@@ -129,17 +132,19 @@
       </div>
 
     </form>
-    <button type="submit" class="btn btn-default" ng-click="$ctrl.analyze()" ng-disabled="$ctrl.busy">Analyze the network</button>
-    <button type="submit" ng-show="$ctrl.overlay!=undefined" class="btn btn-default" ng-click="$ctrl.hideAnalyze()" ng-disabled="$ctrl.busy">{{$ctrl.showHideResultText}}</button>
+    <button type="submit" class="btn btn-default" ng-click="$ctrl.analyze()"
+      analytics-on ng-disabled="$ctrl.busy">Analyze the network</button>
+    <button type="submit" ng-show="$ctrl.overlay!=undefined" class="btn btn-default"
+      ng-click="$ctrl.hideAnalyze()" ng-disabled="$ctrl.busy">{{$ctrl.showHideResultText}}</button>
   </div>
   <div role="tabpanel" class="tab-pane" id="coverage">
     <h4>Coverage</h4>
-    <object ng-attr-data="{{$ctrl.coverage}}" type="application/pdf" width="100%" style="height: 100vh">
+    <object analytics-on ng-attr-data="{{$ctrl.coverage}}" type="application/pdf" width="100%" style="height: 100vh">
     </object>
   </div>
   <div role="tabpanel" class="tab-pane" id="loss">
     <h4>Loss</h4>
-    <object ng-attr-data="{{$ctrl.loss}}" type="application/pdf" width="100%" style="height: 100vh">
+    <object analytics-on ng-attr-data="{{$ctrl.loss}}" type="application/pdf" width="100%" style="height: 100vh">
     </object>
   </div>
 </div> <!-- tab content -->
