@@ -106,6 +106,10 @@ angular.module("cslpwanApp")
         //me.map = { center: { latitude: 45, longitude: -73 }, zoom: 8 };
         me.map = { center:{ latitude: 45, longitude: -73 }, bounds: {},
           zoom: 7, pan: true };
+        me.mapoptions = {
+                            disableDoubleClickZoom:true,
+                            fullscreenControl:true,
+                          };
         me.sampleSize = 500;
         me.numBase = [1];
         me.numRuns = 2;

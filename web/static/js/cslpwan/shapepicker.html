@@ -45,6 +45,7 @@
   center='$ctrl.map.center' pan='$ctrl.map.pan'
   zoom='$ctrl.map.zoom' bounds='$ctrl.map.bounds'
   control='$ctrl.mapcontrol'
+  options='$ctrl.mapoptions'
   style='height: 400px'>
 
   <ui-gmap-polygons ng-if='$ctrl.show.selection'
@@ -101,8 +102,13 @@
       ng-model="$ctrl.sampleSize" ng-options="x for x in [100,500,1000]"
       ng-disabled="$ctrl.busy">
     </select>
-    <button type="submit" class="btn btn-default" ng-click="$ctrl.samplePoints(true)" ng-disabled="$ctrl.busy">Sample</button>
-    <button type="submit" class="btn btn-default" ng-click="$ctrl.hideSamplePoints()" ng-disabled="$ctrl.busy">{{$ctrl.showHideButtonText}}</button>
+    <button type="submit" class="btn btn-default"
+      ng-click="$ctrl.samplePoints(true)"
+      ng-disabled="$ctrl.busy">Sample</button>
+    <button type="submit" class="btn btn-default"
+      ng-click="$ctrl.hideSamplePoints()"
+      ng-show="$ctrl.points.length>0"
+      ng-disabled="$ctrl.busy">{{$ctrl.showHideButtonText}}</button>
   </div>
 </form>
 </div>
